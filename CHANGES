@@ -1,19 +1,31 @@
 # OpenAgent — Change Log
 
+## 0.2.0 — 2026-10-18
+- Added optional Playwright Browser Manager and separate backend implementation.
+- Supports `persistent` (dedicated profile) and `cdp` (local existing browser)
+  modes; no automated login or site-specific scraping.
+- Added explicit request-tab ownership, origin restriction, navigation timeout,
+  tab cap, state reporting, failure cleanup, and disconnected/restart behavior.
+- Added `openagent browser probe` with visible/headless and CDP options.
+- Changed the default port from 8765 to Windows-tested 12321; added
+  `OPENAGENT_PORT`, `--strict-port`, and port availability fallback.
+- Added browser-specific documentation and offline lifecycle/backend tests.
+- Kept command execution outside of the bridge and model adapters mock-only.
+
 ## 0.1.1 — 2026-10-18
-- Added root-level `TODO`, `PROFILE`, `CHANGES`, and `.gitignore`.
-- Fixed Windows PowerShell environment activation/setup instructions.
-- Lowered Python requirement from 3.11+ to 3.10+ (the code uses compatible syntax).
-- Made development dependency resolution consistent: `pytest>=8.2,<10`,
-  `pytest-asyncio>=1.3,<2`, and `httpx>=0.27,<1`.
-- Updated package and API/health version to 0.1.1.
-- Added a regression test for the package/health version.
+- Added root-level TODO, PROFILE, CHANGES and .gitignore.
+- Corrected Windows PowerShell environment instructions.
+- Updated Python compatibility requirement to 3.10+ and development
+  dependency constraints.
+- Added package/API version regression tests.
 
 ## 0.1.0 — 2026-10-18
-- Initial FastAPI-compatible bridge with provider registry and mock provider.
-- Introduced capability manifests, OAP/1 validation, and a SQLite session journal.
-- Added basic SSE completion response and tests.
+- Added FastAPI-compatible bridge, mock provider and capabilities.
+- Added OAP/1 validation and a durable SQLite session journal.
+- Added basic synthetic SSE and API/session tests.
 
 ## Known limitations
-- No live browser adapter and no provider-native streaming.
-- PyPI installation resolution on Windows/Python 3.10 needs user-side validation.
+- Browser probes and backend ownership are tested with deterministic fakes;
+  no live Chromium/browser probe was executed by this package's release tests.
+- No real ChatGPT, Claude or DeepSeek provider implemented.
+- No native streaming, file transfer, or tool executor implemented.

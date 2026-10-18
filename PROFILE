@@ -1,41 +1,47 @@
 # OpenAgent — Project Profile
 
-## Identity and goal
-OpenAgent is a provider-independent Python AI bridge, intended to serve clients like
-OpenCode and 9Router. The standalone coding agent is a later, independent layer.
+## Identity
+Python provider-independent bridge for AI-powered clients such as OpenCode
+and 9Router. A separate standalone coding agent is a later product layer.
 
-## Technical baseline
-- Runtime: Python 3.10 or newer.
-- HTTP: FastAPI; local endpoint defaults to 127.0.0.1:8765.
-- Validation: Pydantic v2; session journal: SQLite.
-- Test tool: pytest and pytest-asyncio.
-- Versioned compact tool envelope: OAP/1.
+## Technology
+- Python >=3.10; FastAPI; Pydantic v2; SQLite; pytest/pytest-asyncio.
+- Browser transport: optional Playwright package, persistent Chromium profile
+  or localhost-only CDP connection.
+- Versioned compact tool protocol: OAP/1 (validation only).
+- Loopback API default: 127.0.0.1:12321; port fallback for Windows reservations.
 
-## Architecture ownership
-- Provider adapters handle model/service communication and advertise actual capabilities.
-- The bridge handles request validation, protocol translation, event streaming, session
-  bookkeeping, and typed failures. The bridge does not run shell commands.
-- Client agents (OpenCode or future OpenAgent runtime) execute model tool requests.
-- Provider transport choices (browser UI, authorized OAuth, API) stay interchangeable.
+## Ownership boundaries
+- Provider: communication, actual model/account features, and service-specific
+  UI or authorized API behavior.
+- Browser Manager: browser connection and created-tab lifecycle only.
+- Bridge: request validation, protocol translation, capability reporting,
+  event streaming, request/session bookkeeping, and typed failures.
+- Client agent: command execution, workspace access, Git, user approvals.
 
-## Working conventions
-- Prefer focused edits with accompanying regression tests.
-- Keep the implementation understandable and favor explicit boundaries over abstraction
-  without a concrete use case.
-- Document known failure modes, retries, ambiguous submissions, and recovery paths.
-- Maintain `TODO`, `CHANGES`, and the user-facing `README.md` after functional changes.
-- Never commit browser profiles, cookies, tokens, session data, logs, or local artifacts.
+## Engineering conventions
+- Prefer small interfaces and explicit lifecycle/ownership transitions.
+- Add focused tests for changes; use mocks for browser failure paths.
+- Treat remote result unknown as different from never submitted; do not retry
+  commands or prompts whose outcomes may already exist.
+- Do not assume a provider's available models, reasoning levels or projects.
+- Keep TODO, PROFILE, CHANGES, README and docs aligned with code.
+- Protect sessions, token material, browser profiles, downloaded artifacts and
+  console diagnostics from accidental publication.
 
-## v0.1.1 verified implementation surface
-- One deterministic mock/echo provider with capability manifest.
-- Compatible `/v1/models` and `/v1/chat/completions` endpoints (limited subset).
-- Session journal and local session endpoints with request IDs and replay protection.
-- OAP/1 envelope parsing/validation; NO tool execution.
+## v0.2.0 implemented
+- Mock provider only; OpenAI Chat Completions subset and local sessions.
+- OAP/1 parser only, no tool execution.
+- BrowserManager with persistent/CDP backend, fail-closed navigation policy,
+  tab ownership, explicit recovery states, mock-backed tests and CLI probe.
+- Windows port selection with default 12321.
 
-## Exclusions / not yet implemented
-No working ChatGPT/Claude/DeepSeek integration, file upload/download, model effort
-selection, ChatGPT project operations, /v1/responses, or standalone tool runtime.
+## v0.2.0 missing
+No real chat site adapter, ChatGPT-native projects, file download/upload,
+model selection, browser interruption, tool-call conversion, direct Codex OAuth,
+or independent coding agent.
 
-## Safety and terms
-Service compatibility and permission must be evaluated per provider. Browser
-integration must not silently bypass site limits or expose authenticated sessions.
+## Security
+Do not use a real everyday Chrome profile as the Playwright persistent user
+profile. CDP must stay loopback. Verify provider permissions and terms before
+live automation. Never execute model instructions inside the bridge.

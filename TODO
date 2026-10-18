@@ -1,33 +1,38 @@
 # OpenAgent — TODO
 
-Keep this list aligned with actual code. Check off work only after tests pass.
+Check off only work covered by tests or a documented manual verification.
 
-## v0.1.1 maintenance
-- [x] Fix Windows PowerShell setup documentation.
-- [x] Support Python 3.10+ in package metadata and dependency constraints.
-- [x] Add TODO, PROFILE, CHANGES, and .gitignore in the project root.
-- [ ] Confirm Windows Python 3.10 installation and test results on a real Windows machine.
+## v0.2.0 — Browser Manager
+- [x] Separate a browser manager from service/model adapters.
+- [x] Support dedicated persistent profiles and local CDP attachment.
+- [x] Enforce tab ownership, page limits, and per-adapter navigation origins.
+- [x] Represent startup, stopped, connected, failed, and disconnected states.
+- [x] Handle navigation failure without leaving a managed tab open.
+- [x] Require explicit transport restart after disconnection; do not replay requests.
+- [x] Make Playwright optional and mock-test the browser lifecycle.
+- [x] Use Windows-friendly default port 12321 and reserved-port fallback.
+- [x] Document Windows setup and browser probes.
+- [ ] Run `browser probe` in headed and CDP modes on user's Windows machine.
+- [ ] Confirm Python 3.10 install and v0.2 full test suite on Windows.
 
-## v0.2 bridge contracts
-- [ ] Design structured provider errors and session/capability lifecycle.
-- [ ] Introduce typed stream events and distinguish synthetic SSE from native streaming.
-- [ ] Define project, conversation, model, effort, upload, and download capabilities as optional methods.
-- [ ] Create mock/fixture-based tests for browser response completion and cancellation.
-- [ ] Add browser lifecycle management with isolated profiles and failure recovery.
+## v0.3 — First authorized model adapter
+- [ ] Define a typed browser provider contract and error codes.
+- [ ] Implement fixture-based chat response completion/cancellation detection.
+- [ ] Implement provider capability discovery (model, effort, projects, files).
+- [ ] Define first-provider permission and terms review before live integration.
+- [ ] Add prompt/response transfer preserving context and request IDs.
+- [ ] Add native tool-call translation for OpenCode compatibility.
+- [ ] Add fixture tests for upload/download, checksums and safe paths.
 
-## v0.3 client interoperability
-- [ ] Preserve caller tool-call IDs and validate tool-result correlation.
-- [ ] Translate OAP/1 JSON tool requests into native compatible tool-call objects.
-- [ ] Run OpenCode compatibility tests against Chat Completions and SSE responses.
-- [ ] Test 9Router integration as a custom OpenAI-compatible provider.
-
-## Later — standalone agent
-- [ ] Implement workspace and path permission policies in a separate agent runtime.
-- [ ] Support Git checkpointing, patch validation, and large result artifacts.
-- [ ] Provide user pause/resume/steer controls and recover across chat context limits.
-- [ ] Add live provider adapters only after capability, permissions, and reliability review.
+## Later — client interoperability and agent runtime
+- [ ] Test OpenCode + 9Router routes and streaming against real adapters.
+- [ ] Add `/v1/responses` and provider-native streaming where available.
+- [ ] Build checkpointing across browser conversations without duplicating commands.
+- [ ] Implement workspace/shell/file tools in a **separate standalone agent**.
+- [ ] Add Git checkpoints, approvals, steering, and patch rollback.
 
 ## Guardrails
-- Do not execute model commands inside the bridge.
-- Do not treat a failed HTTP response as proof a remote turn was never submitted.
-- Do not claim compatibility or model features unless actually tested.
+- Never run model-produced shell commands in the bridge.
+- Do not treat reconnect as permission to resubmit an ambiguous remote turn.
+- Never commit profile/cookie/session/token material.
+- Do not claim support for a web model until a real test proves it.
