@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+.venv/
+venv/
+env/
+.python-version
+*.egg-info/
+dist/
+build/
+.wheels/
+
+# Tests / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Environment & credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*token*.json
+*cookie*.json
+
+# Local OpenAgent state / browser profiles
+.openagent/
+.openagent-*/
+*chrome-profile*/
+*browser-profile*/
+playwright-report/
+test-results/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.log
+logs/
+artifacts/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

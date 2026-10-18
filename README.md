@@ -1,4 +1,4 @@
-# OpenAgent Bridge — v0.1 starter
+# OpenAgent Bridge — v0.1.1 starter
 
 A **working starter**, not a complete coding agent or a working ChatGPT/DeepSeek browser connector.
 
@@ -6,19 +6,57 @@ The initial release proves a provider-independent contract, preserves system/too
 
 ## Requirements
 
-Python 3.11+
+Python **3.10 or newer** (tested in this package's development environment with
+Python 3.13; validate Python 3.10 on Windows as part of installation).
 
-## Run
+## Install and run — Windows PowerShell
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e '.[dev]'
-pytest -q
-openagent serve
+Open PowerShell in the directory containing `pyproject.toml`.
+
+```powershell
+py -3.10 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -c "import sys; print(sys.executable); print(sys.version)"
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+python -m pytest -q
+python -m openagent.cli serve
 ```
 
-On Windows, activate using `.venv\\Scripts\\activate` instead.
+You may replace `py -3.10` with `py -3.11`, `py -3.12`, or your installed Python
+version. If the `py` launcher is missing, use `python -m venv .venv`.
+The reported `sys.executable` path should end in `.venv\Scripts\python.exe`.
+
+If PowerShell blocks activation scripts, use:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+Or **skip activation entirely** and run the environment's interpreter explicitly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m openagent.cli serve
+```
+
+Do not use `source` in PowerShell. `activate.bat` is for `cmd.exe` and does not
+activate the parent PowerShell process. If pip reports "Defaulting to user
+installation", check your Python executable: the intended venv may not be active.
+
+For Command Prompt (`cmd.exe`), use `.venv\Scripts\activate.bat`.
+
+## Install and run — Linux/macOS
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+python -m pytest -q
+python -m openagent.cli serve
+```
 
 By default, the HTTP API listens on `http://127.0.0.1:8765` and uses a local SQLite database at `~/.openagent/sessions.db`.
 
@@ -57,6 +95,12 @@ A repeated `request_id` returns the committed response. An unresolved or unknown
 - Do not expose Chrome debugging ports, session databases, tokens, or the API to an untrusted network.
 - The service returns generic provider errors to avoid exposing secrets.
 - No shell tool execution is implemented in the bridge.
+
+## Project maintenance files
+
+`TODO` is the development backlog, `PROFILE` describes project assumptions and
+architecture conventions, `CHANGES` records releases, and `.gitignore` protects
+local environments and session artifacts.
 
 ## Scope and next steps
 

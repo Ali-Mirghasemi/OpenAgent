@@ -51,7 +51,7 @@ def sse_completion(model: str, output: Any, request_id: str):
 
 
 def create_app(registry: Registry, store: SessionStore, *, api_token: str | None = None) -> FastAPI:
-    app = FastAPI(title="OpenAgent Bridge", version="0.1.0")
+    app = FastAPI(title="OpenAgent Bridge", version="0.1.1")
 
     @app.middleware("http")
     async def authorize(request: Request, call_next):
@@ -63,7 +63,7 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "service": "openagent-bridge", "version": "0.1.0"}
+        return {"status": "ok", "service": "openagent-bridge", "version": "0.1.1"}
 
     @app.get("/v1/models")
     async def models():

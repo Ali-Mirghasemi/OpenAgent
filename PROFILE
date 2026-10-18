@@ -1,0 +1,41 @@
+# OpenAgent — Project Profile
+
+## Identity and goal
+OpenAgent is a provider-independent Python AI bridge, intended to serve clients like
+OpenCode and 9Router. The standalone coding agent is a later, independent layer.
+
+## Technical baseline
+- Runtime: Python 3.10 or newer.
+- HTTP: FastAPI; local endpoint defaults to 127.0.0.1:8765.
+- Validation: Pydantic v2; session journal: SQLite.
+- Test tool: pytest and pytest-asyncio.
+- Versioned compact tool envelope: OAP/1.
+
+## Architecture ownership
+- Provider adapters handle model/service communication and advertise actual capabilities.
+- The bridge handles request validation, protocol translation, event streaming, session
+  bookkeeping, and typed failures. The bridge does not run shell commands.
+- Client agents (OpenCode or future OpenAgent runtime) execute model tool requests.
+- Provider transport choices (browser UI, authorized OAuth, API) stay interchangeable.
+
+## Working conventions
+- Prefer focused edits with accompanying regression tests.
+- Keep the implementation understandable and favor explicit boundaries over abstraction
+  without a concrete use case.
+- Document known failure modes, retries, ambiguous submissions, and recovery paths.
+- Maintain `TODO`, `CHANGES`, and the user-facing `README.md` after functional changes.
+- Never commit browser profiles, cookies, tokens, session data, logs, or local artifacts.
+
+## v0.1.1 verified implementation surface
+- One deterministic mock/echo provider with capability manifest.
+- Compatible `/v1/models` and `/v1/chat/completions` endpoints (limited subset).
+- Session journal and local session endpoints with request IDs and replay protection.
+- OAP/1 envelope parsing/validation; NO tool execution.
+
+## Exclusions / not yet implemented
+No working ChatGPT/Claude/DeepSeek integration, file upload/download, model effort
+selection, ChatGPT project operations, /v1/responses, or standalone tool runtime.
+
+## Safety and terms
+Service compatibility and permission must be evaluated per provider. Browser
+integration must not silently bypass site limits or expose authenticated sessions.
