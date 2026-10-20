@@ -27,3 +27,7 @@ class Registry:
         for provider in self._providers.values():
             result.extend(await provider.models())
         return result
+
+    def get(self, provider_id: str) -> Provider | None:
+        """Lookup by provider ID for diagnostic routes; does not resolve a model."""
+        return self._providers.get(provider_id)

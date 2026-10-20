@@ -30,6 +30,16 @@ and 9Router. A separate standalone coding agent is a later product layer.
 - Protect sessions, token material, browser profiles, downloaded artifacts and
   console diagnostics from accidental publication.
 
+## v0.4.0 implemented (preview)
+- Experimental, explicit opt-in `chatgpt-web/default` adapter for the public
+  ChatGPT UI, *not* native API access and not a verified live integration.
+- Turn-local copy action + pending/busy checks required before completing a turn.
+- Read-only UI status CLI/API; bridge enforces a bearer token when browser-backed
+  account access is enabled, including loopback-only deployments.
+- This model ID is a sentinel for the browser's current UI selection, not a
+  verified model or effort level. No file transfer, projects, streaming or tools.
+- Synthetic DOM + real Chromium fixture tests; no live website validation.
+
 ## v0.3.0 implemented
 - Provider-neutral DOM UI selector contract and status classifier. A UI status
   is evidence from explicit selectors, not proof of account authentication.
@@ -61,7 +71,7 @@ and 9Router. A separate standalone coding agent is a later product layer.
 - Windows port selection with default 12321.
 
 ## Not yet implemented
-No real chat site adapter, ChatGPT-native projects, file download/upload,
+No live-verified chat site adapter, ChatGPT-native projects, file download/upload,
 model selection, browser interruption, tool-call conversion, direct Codex OAuth,
 or independent coding agent.
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 import secrets
 import time
 import uuid
@@ -51,8 +52,17 @@ def sse_completion(model: str, output: Any, request_id: str):
     yield "data: [DONE]\n\n"
 
 
-def create_app(registry: Registry, store: SessionStore, *, api_token: str | None = None) -> FastAPI:
-    app = FastAPI(title="OpenAgent Bridge", version=__version__)
+def create_app(registry: Registry, store: SessionStore, *, api_token: str | None = None,
+               browser_manager: Any | None = None) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        try:
+            yield
+        finally:
+            if browser_manager is not None:
+                await browser_manager.stop()
+
+    app = FastAPI(title="OpenAgent Bridge", version=__version__, lifespan=lifespan)
 
     @app.middleware("http")
     async def authorize(request: Request, call_next):
@@ -82,6 +92,17 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
             raise HTTPException(404, "unknown model")
         return (await provider.capabilities(model)).model_dump(mode="json")
 
+    @app.get("/openagent/providers/{provider_id}/diagnostics")
+    async def provider_diagnostics(provider_id: str):
+        provider = registry.get(provider_id)
+        if provider is None or not callable(getattr(provider, "inspect", None)):
+            raise HTTPException(404, "provider has no browser diagnostics")
+        try:
+            observation = await provider.inspect()
+            return observation.as_dict()
+        except Exception:
+            return error_response("browser diagnostics unavailable", 503, "provider_error")
+
     @app.post("/v1/chat/completions")
     async def completions(body: CompletionRequest):
         try:
@@ -95,8 +116,15 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
             return error_response("streaming unsupported for this adapter", 422)
         try:
             output = await provider.complete(body.model, body.messages, tools=body.tools)
-        except Exception:
-            # Do not leak web credentials, URLs, or sensitive provider internals.
+        except Exception as exc:
+            # Only the adapter's finite, sanitized error codes are exposed.
+            from .providers.browser_ui import BrowserUIError
+            if isinstance(exc, BrowserUIError):
+                status = 409 if exc.code == "remote_outcome_unknown" else 503
+                return JSONResponse({"error": {
+                    "message": str(exc), "type": "provider_error", "code": exc.code,
+                }}, status_code=status)
+            # Never leak page contents, browser paths, URLs or credentials.
             return error_response("provider execution failed", 502, "provider_error")
         request_id = "chatcmpl-" + uuid.uuid4().hex
         if body.stream:

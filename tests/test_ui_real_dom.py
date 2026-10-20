@@ -12,6 +12,25 @@ from openagent.models import Message
 from openagent.providers.browser_ui import BrowserSiteProfile, BrowserUIProvider
 
 
+def find_chromium_executable():
+    """Find a test browser, including OpenAgent's saved portable executable.
+
+    Tests still use a disposable profile and locally injected HTML. The selected
+    user's browser profile, cookies and remote pages are never accessed.
+    """
+    executable = shutil.which("chromium") or shutil.which("google-chrome")
+    if executable:
+        return executable
+    from openagent.browser.selection import load_selection
+    selected = load_selection()
+    if selected.get("browser") not in {"chromium", "chrome", "msedge"}:
+        return None
+    path = selected.get("executable_path")
+    if path and Path(path).is_file():
+        return str(Path(path))
+    return None
+
+
 class LocalContentPage:
     def __init__(self, page, html):
         self._page = page
@@ -55,7 +74,7 @@ class LocalContentBackend:
 
 @pytest.mark.asyncio
 async def test_real_chromium_dom_fixture(tmp_path):
-    browser_executable = shutil.which("chromium") or shutil.which("google-chrome")
+    browser_executable = find_chromium_executable()
     if browser_executable is None:
         pytest.skip("No local system Chromium executable for optional DOM integration")
     try:

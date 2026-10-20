@@ -1,5 +1,21 @@
 # OpenAgent — Change Log
 
+## 0.4.0 — 2026-10-20
+- Added opt-in `chatgpt-web/default` public UI preview behind `--enable-chatgpt-web`;
+  browser profile selection is inherited from v0.2.1. No automated login.
+- Added ChatGPT-specific DOM completion requiring a *new*, completed assistant
+  turn and no active generation or pending state; stale copy buttons ignored.
+- Added `browser chatgpt-status` for read-only readiness/permission diagnostics
+  and `/openagent/providers/chatgpt-web/diagnostics` when registered.
+- Added account-capable HTTP protection: `OPENAGENT_API_TOKEN` is required
+  with `--enable-chatgpt-web`, even on loopback.
+- Added safe adapter error codes and server-lifespan browser teardown.
+- Added injected ChatGPT-shaped HTML fixture (real Chromium) and offline tests;
+  optional DOM tests also discover the selected portable Chromium executable
+  using a disposable test profile, without accessing the user's login data.
+- 72 tests passed on Linux; Windows runtime and live ChatGPT behavior unverified.
+- No verified ChatGPT model switching, projects, file transfer, native tools or streaming.
+
 ## 0.3.0 — 2026-10-20
 - Added selector-driven UI diagnostics with structured visual states and no
   credential/cookie extraction; CLI `browser diagnose`.
@@ -62,5 +78,6 @@
 ## Known limitations
 - Browser probes and backend ownership are tested with deterministic fakes;
   no live Chromium/browser probe was executed by this package's release tests.
-- No real ChatGPT, Claude or DeepSeek provider implemented.
+- Live ChatGPT UI interaction has not been verified; the preview may report
+  `ui_changed` or `generation_timeout`. No Claude/DeepSeek provider yet.
 - No native streaming, file transfer, or tool executor implemented.

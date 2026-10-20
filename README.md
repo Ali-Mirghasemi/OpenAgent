@@ -158,6 +158,49 @@ async with BrowserManager(config) as browser:
 `open_tab()` does **not** submit prompts. A failed or disconnected request is
 not retried automatically, because its remote completion state may be unknown.
 
+## v0.4 — experimental ChatGPT public-UI adapter (opt-in)
+
+Version 0.4 adds a **ChatGPT-shaped browser adapter** and a provider-specific
+completion detector. This is an **unverified preview** of live website support,
+not a claim of working ChatGPT automation or permitted account use.
+`chatgpt-web/default` refers to the model **currently selected in the website
+UI**. There is no model/plan/effort discovery or selection yet, and no native
+tools, file transfers, provider-side conversation continuation or true streaming.
+
+Read-only UI check (uses the previously selected OpenAgent browser/profile):
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful
+```
+
+The result reports observable `ready`, `login_required`, `security_challenge`,
+`ui_changed` etc. UI readiness is not account-authentication proof.
+
+To explicitly enable this experimental backend over loopback HTTP, **set a
+strong local token** in `OPENAGENT_API_TOKEN` and start:
+
+```powershell
+# Supply your own strong, local-only token for this session first
+$env:OPENAGENT_API_TOKEN = Read-Host "Local OpenAgent API token"
+.\.venv\Scripts\python.exe -m openagent.cli serve --enable-chatgpt-web --headful
+```
+
+Visit `/v1/models` with `Authorization: Bearer <your token>` to see
+`chatgpt-web/default`; `/openagent/capabilities/chatgpt-web/default` shows
+unknown/unsupported features explicitly. Read-only status is at
+`/openagent/providers/chatgpt-web/diagnostics`. The existing `mock/echo`
+remains available. Non-streaming completion is experimental and must only be
+used with a provider/account where browser automation is permitted.
+
+**Never use the normal Chrome profile.** If a site blocks a browser-controlled
+login, use its officially supported authentication interface rather than
+trying to bypass security controls. A failed or ambiguous submission is never
+silently replayed.
+
+See [docs/chatgpt-preview.md](docs/chatgpt-preview.md). A local, deterministic
+ChatGPT-shaped HTML fixture is also tested in a real Chromium browser; no live
+commercial-service interaction is part of the tests.
+
 ## v0.3 — test the browser UI adapter locally
 
 This exercises the browser UI adapter on a **local test webpage**, not a paid AI

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>OpenAgent ChatGPT UI contract fixture</title></head>
+<body>
+<main id="history">
+  <article data-testid="conversation-turn-1">
+    <div data-message-author-role="assistant"><div class="markdown">Old answer</div></div>
+    <button data-testid="copy-turn-action-button">Copy old</button>
+  </article>
+</main>
+<textarea id="prompt-textarea" aria-label="Message"></textarea>
+<button data-testid="send-button">Send</button>
+<button data-testid="stop-button" hidden>Stop</button>
+<script>
+  const history = document.querySelector('#history');
+  const stop = document.querySelector('[data-testid="stop-button"]');
+  document.querySelector('[data-testid="send-button"]').addEventListener('click', () => {
+    const article = document.createElement('article');
+    article.dataset.testid = 'conversation-turn-2';
+    const answer = document.createElement('div');
+    answer.setAttribute('data-message-author-role', 'assistant');
+    const markdown = document.createElement('div');
+    markdown.className = 'markdown';
+    answer.appendChild(markdown);
+    const pending = document.createElement('span');
+    pending.setAttribute('aria-busy', 'true');
+    answer.appendChild(pending);
+    const copy = document.createElement('button');
+    copy.dataset.testid = 'copy-turn-action-button';
+    copy.textContent = 'Copy new';
+    article.append(answer, copy);
+    history.append(article);
+    stop.hidden = false;
+    setTimeout(() => { markdown.textContent = 'Partial answer'; }, 30);
+    // Early copy marker MUST NOT allow a partial response to be returned.
+    setTimeout(() => {
+      markdown.textContent = 'Final answer from browser DOM';
+      pending.remove();
+      stop.hidden = true;
+    }, 240);
+  }, {once: true});
+</script>
+</body></html>

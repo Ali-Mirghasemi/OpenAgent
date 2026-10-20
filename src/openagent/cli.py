@@ -222,6 +222,22 @@ async def _fixture_chat(args: argparse.Namespace) -> int:
         return 1
 
 
+async def _chatgpt_status(args: argparse.Namespace) -> int:
+    """Read-only public UI inspection; no login or prompt submission."""
+    from .browser import BrowserManager, BrowserError
+    from .providers.chatgpt_web import ChatGPTWebProvider
+    try:
+        config = _browser_settings(args)
+        config = replace(config, allowed_origins=("https://chatgpt.com",))
+        async with BrowserManager(config) as manager:
+            observation = await ChatGPTWebProvider(manager).inspect()
+            print(json.dumps(observation.as_dict(), indent=2))
+        return 0 if observation.state == "ready" else 2
+    except (BrowserError, ValueError) as exc:
+        print(f"ChatGPT UI diagnostics failed: {exc}")
+        return 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="openagent")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -231,6 +247,13 @@ def main() -> None:
     serve.add_argument("--port", type=int, default=_env_port())
     serve.add_argument("--strict-port", action="store_true", help="disable automatic fallback for reserved/busy ports")
     serve.add_argument("--database", type=Path, default=Path.home() / ".openagent" / "sessions.db")
+    serve.add_argument("--enable-chatgpt-web", action="store_true", help="EXPERIMENTAL opt-in for ChatGPT public UI; requires a permitted session")
+    serve.add_argument("--mode", choices=["persistent", "cdp"], default="persistent")
+    serve.add_argument("--browser", choices=["chromium", "chrome", "msedge", "firefox"])
+    serve.add_argument("--browser-path", type=Path)
+    serve.add_argument("--profile-dir", type=Path)
+    serve.add_argument("--cdp-url", default="http://127.0.0.1:9222")
+    serve.add_argument("--headful", action="store_true")
 
     browser = sub.add_parser("browser", help="browser discovery, selection and diagnostics")
     browser_sub = browser.add_subparsers(dest="browser_command", required=True)
@@ -268,11 +291,13 @@ def main() -> None:
     diagnose.add_argument("--busy-selector")
     diagnose.add_argument("--done-selector")
 
+    chatgpt_status = browser_sub.add_parser("chatgpt-status", help="EXPERIMENTAL read-only ChatGPT UI status, not a login proof")
+
     fixture = browser_sub.add_parser("ui-test", help="submit one turn ONLY to a locally hosted UI fixture")
     fixture.add_argument("--url", default="http://127.0.0.1:8999/chat_fixture.html")
     fixture.add_argument("--message", default="Hello from OpenAgent")
 
-    for p in (diagnose, fixture):
+    for p in (diagnose, fixture, chatgpt_status):
         p.add_argument("--mode", choices=["persistent", "cdp"], default="persistent")
         p.add_argument("--browser", choices=["chromium", "chrome", "msedge", "firefox"])
         p.add_argument("--browser-path", type=Path)
@@ -290,6 +315,8 @@ def main() -> None:
             raise SystemExit(asyncio.run(_diagnose_browser(args)))
         if args.browser_command == "ui-test":
             raise SystemExit(asyncio.run(_fixture_chat(args)))
+        if args.browser_command == "chatgpt-status":
+            raise SystemExit(asyncio.run(_chatgpt_status(args)))
         if args.browser_command == "open":
             try:
                 code = asyncio.run(_open_browser(args))
@@ -302,6 +329,10 @@ def main() -> None:
         raise SystemExit(asyncio.run(_probe_browser(args)))
 
     token = os.environ.get("OPENAGENT_API_TOKEN") or None
+    # Unlike the mock, this adapter can act on a real signed-in account.
+    # Require authentication even when the HTTP listener is loopback-only.
+    if args.enable_chatgpt_web and not token:
+        parser.error("--enable-chatgpt-web requires OPENAGENT_API_TOKEN (even on loopback)")
     if args.host not in ("127.0.0.1", "::1", "localhost") and not token:
         parser.error("non-loopback host requires OPENAGENT_API_TOKEN")
     try:
@@ -315,9 +346,22 @@ def main() -> None:
 
     registry = Registry()
     registry.register(MockProvider())
+    browser_manager = None
+    if args.enable_chatgpt_web:
+        from .browser import BrowserManager
+        from .providers.chatgpt_web import ChatGPTWebProvider
+        try:
+            config = replace(_browser_settings(args), allowed_origins=("https://chatgpt.com",))
+            browser_manager = BrowserManager(config)
+            registry.register(ChatGPTWebProvider(browser_manager))
+        except (ValueError, OSError) as exc:
+            parser.error(f"invalid ChatGPT browser configuration: {exc}")
+        print("EXPERIMENTAL ChatGPT UI adapter: no plan/model verification, no native tools, no automatic login.", flush=True)
+        print("Only use where the provider permits automated interaction; account challenges stop the request.", flush=True)
     store = SessionStore(args.database)
     try:
-        uvicorn.run(create_app(registry, store, api_token=token), host=args.host, port=port)
+        uvicorn.run(create_app(registry, store, api_token=token, browser_manager=browser_manager),
+                    host=args.host, port=port)
     finally:
         store.close()
 

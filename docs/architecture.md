@@ -61,3 +61,18 @@ Keep browser CDP loopback-only; reject default browser profiles and non-HTTPS
 remote URL navigation. Runtime error messages may contain credentials: do not
 expose full Playwright exceptions to HTTP clients. Evaluate terms and model
 permissions per adapter. See [browser-manager.md](browser-manager.md).
+
+
+## Experimental browser-backed provider (v0.4)
+
+`ChatGPTWebProvider` is optional and delegates browser ownership to the existing
+`BrowserManager`, which is closed by the FastAPI lifespan at server shutdown.
+Browser startup is lazy; requests are serialized per provider instance. A single
+turn opens a new, owned tab, sends the full serialized caller history as text
+(no provider-native roles), and requires new-turn DOM completion evidence before
+returning. The bridge still refuses unsupported streaming and native tools.
+
+`chatgpt-web/default` denotes *the UI selection*, not a verified model.
+`--enable-chatgpt-web` requires `OPENAGENT_API_TOKEN` even on loopback.
+Public website permissions and account verification are separate from transport
+capability; no live third-party service was exercised by the release tests.
