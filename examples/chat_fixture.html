@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>OpenAgent Local Chat Fixture</title></head>
+<body>
+<h1>OpenAgent local UI fixture — no account required</h1>
+<textarea id="oa-composer" aria-label="Chat message"></textarea>
+<button id="oa-send">Send</button>
+<span id="oa-busy" hidden>Generating</span>
+<span id="oa-done" hidden>Completed</span>
+<section id="oa-messages"></section>
+<script>
+const prompt = document.querySelector('#oa-composer');
+const send = document.querySelector('#oa-send');
+const busy = document.querySelector('#oa-busy');
+const done = document.querySelector('#oa-done');
+send.addEventListener('click', () => {
+  done.hidden = true;
+  busy.hidden = false;
+  send.disabled = true;
+  const text = prompt.value;
+  const reply = document.createElement('article');
+  reply.className = 'oa-assistant';
+  document.querySelector('#oa-messages').appendChild(reply);
+  setTimeout(() => { reply.textContent = 'Processing the conversation...'; }, 100);
+  setTimeout(() => {
+    try {
+      const content = JSON.parse(text.split('OpenAgent ordered conversation (JSON):\n')[1].split('\nRespond to the final user request.')[0]);
+      const last = content.filter(x => x.role === 'user').at(-1);
+      reply.textContent = `Fixture received ${content.length} message(s); last user: ${last?.content ?? '(none)'}`;
+    } catch (_) {
+      reply.textContent = 'Fixture could not parse the message envelope.';
+    }
+    busy.hidden = true;
+    done.hidden = false;
+    send.disabled = false;
+  }, 400);
+});
+</script></body></html>

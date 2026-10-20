@@ -30,6 +30,16 @@ and 9Router. A separate standalone coding agent is a later product layer.
 - Protect sessions, token material, browser profiles, downloaded artifacts and
   console diagnostics from accidental publication.
 
+## v0.3.0 implemented
+- Provider-neutral DOM UI selector contract and status classifier. A UI status
+  is evidence from explicit selectors, not proof of account authentication.
+- One-shot experimental `BrowserUIProvider`: full ordered JSON transcript,
+  new-answer anchoring, explicit completion indicators, no native tool calls.
+- A fixture-only submission CLI restricted to loopback; separate read-only
+  diagnostics command with operator-supplied selectors.
+- No provider-specific live model is registered; browser website terms and
+  model controls must be independently verified before adding one.
+
 ## v0.2.2 implemented
 - Offline Windows simulated-environment isolation (no real Registry reads).
 - Portable Chrome/Chromium discovery deduplication by executable.
@@ -50,7 +60,7 @@ and 9Router. A separate standalone coding agent is a later product layer.
   tab ownership, explicit recovery states, mock-backed tests and CLI probe.
 - Windows port selection with default 12321.
 
-## v0.2.0 missing
+## Not yet implemented
 No real chat site adapter, ChatGPT-native projects, file download/upload,
 model selection, browser interruption, tool-call conversion, direct Codex OAuth,
 or independent coding agent.

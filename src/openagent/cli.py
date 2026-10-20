@@ -165,6 +165,63 @@ def _select_browser(args: argparse.Namespace) -> int:
     return 0
 
 
+async def _diagnose_browser(args: argparse.Namespace) -> int:
+    """Read-only UI diagnosis. Selector flags are provided by the operator."""
+    from .browser import BrowserManager, BrowserError
+    from .browser.diagnostics import UISelectors, inspect_ui
+
+    try:
+        selectors = UISelectors(
+            composer=args.composer, send_button=args.send_button,
+            assistant_message=args.assistant_message,
+            login_required=args.login_selector,
+            security_challenge=args.challenge_selector,
+            rate_limited=args.rate_selector,
+            generation_in_progress=args.busy_selector,
+            response_complete=args.done_selector,
+        )
+        config = _browser_settings(args)
+        async with BrowserManager(config) as manager:
+            page = await manager.open_tab("diagnostics", args.url)
+            observation = await inspect_ui(page, selectors)
+            print(json.dumps(observation.as_dict(), indent=2))
+            await manager.close_tab("diagnostics")
+        return 0 if observation.state == "ready" else 2
+    except (BrowserError, ValueError) as exc:
+        print(f"Browser diagnostics failed: {exc}")
+        return 1
+
+
+async def _fixture_chat(args: argparse.Namespace) -> int:
+    """Exercise the DOM adapter against a local, user-controlled HTTP fixture."""
+    from urllib.parse import urlsplit
+    from .browser import BrowserManager, BrowserError
+    from .browser.diagnostics import UISelectors
+    from .models import Message
+    from .providers.browser_ui import BrowserSiteProfile, BrowserUIProvider, BrowserUIError
+
+    address = urlsplit(args.url)
+    if address.scheme != "http" or address.hostname not in ("127.0.0.1", "localhost", "::1"):
+        print("ui-test requires a local HTTP fixture URL, never a public AI website")
+        return 1
+    try:
+        config = _browser_settings(args)
+        selectors = UISelectors(
+            composer="#oa-composer", send_button="#oa-send",
+            assistant_message=".oa-assistant", generation_in_progress="#oa-busy:not([hidden])",
+            response_complete="#oa-done:not([hidden])",
+        )
+        site = BrowserSiteProfile("fixture", "fixture/ui", args.url, selectors)
+        async with BrowserManager(config) as manager:
+            provider = BrowserUIProvider(site, manager)
+            result = await provider.complete(site.model_id, [Message(role="user", content=args.message)])
+            print(result.content)
+        return 0
+    except (BrowserError, BrowserUIError, ValueError) as exc:
+        print(f"UI fixture failed: {exc}")
+        return 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="openagent")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -200,12 +257,39 @@ def main() -> None:
     open_cmd.add_argument("--profile-dir", type=Path, help="dedicated persistent OpenAgent profile")
     open_cmd.set_defaults(mode="persistent", cdp_url="http://127.0.0.1:9222", headful=True)
 
+    diagnose = browser_sub.add_parser("diagnose", help="read-only status of a page using explicit UI selectors")
+    diagnose.add_argument("--url", required=True)
+    diagnose.add_argument("--composer", default="#oa-composer", help="visible composer selector")
+    diagnose.add_argument("--send-button", default="#oa-send", help="visible send button selector")
+    diagnose.add_argument("--assistant-message", default=".oa-assistant")
+    diagnose.add_argument("--login-selector")
+    diagnose.add_argument("--challenge-selector")
+    diagnose.add_argument("--rate-selector")
+    diagnose.add_argument("--busy-selector")
+    diagnose.add_argument("--done-selector")
+
+    fixture = browser_sub.add_parser("ui-test", help="submit one turn ONLY to a locally hosted UI fixture")
+    fixture.add_argument("--url", default="http://127.0.0.1:8999/chat_fixture.html")
+    fixture.add_argument("--message", default="Hello from OpenAgent")
+
+    for p in (diagnose, fixture):
+        p.add_argument("--mode", choices=["persistent", "cdp"], default="persistent")
+        p.add_argument("--browser", choices=["chromium", "chrome", "msedge", "firefox"])
+        p.add_argument("--browser-path", type=Path)
+        p.add_argument("--profile-dir", type=Path)
+        p.add_argument("--cdp-url", default="http://127.0.0.1:9222")
+        p.add_argument("--headful", action="store_true")
+
     args = parser.parse_args()
     if args.command == "browser":
         if args.browser_command == "discover":
             raise SystemExit(_discovery(args))
         if args.browser_command == "select":
             raise SystemExit(_select_browser(args))
+        if args.browser_command == "diagnose":
+            raise SystemExit(asyncio.run(_diagnose_browser(args)))
+        if args.browser_command == "ui-test":
+            raise SystemExit(asyncio.run(_fixture_chat(args)))
         if args.browser_command == "open":
             try:
                 code = asyncio.run(_open_browser(args))

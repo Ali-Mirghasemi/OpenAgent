@@ -1,5 +1,17 @@
 # OpenAgent — Change Log
 
+## 0.3.0 — 2026-10-20
+- Added selector-driven UI diagnostics with structured visual states and no
+  credential/cookie extraction; CLI `browser diagnose`.
+- Added experimental `BrowserUIProvider` and `BrowserSiteProfile` with
+  full ordered JSON transcript preservation, response anchoring, stable
+  completion evidence, and no automatic resubmission after uncertainty.
+- Added offline local HTML chat fixture and loopback-only `browser ui-test`.
+- Added tests for authentication markers, completion indicators, timeouts,
+  cancellation, stale markers, and a real Chromium DOM test using injected HTML.
+- Left live model registration, provider authentication, and native tool-call
+  translation unimplemented; no new public website was automated.
+
 ## 0.2.2 — 2026-10-20
 - Fixed Windows discovery fixture isolation: when paths/environment are injected,
   discovery no longer reads real system Registry installations.

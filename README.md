@@ -1,9 +1,11 @@
-# OpenAgent Bridge — v0.2.2
+# OpenAgent Bridge — v0.3.0
 
-**Early Python foundation for a provider-independent AI bridge.** The optional
-Playwright Browser Manager is now implemented. There is still **no live
-ChatGPT, Claude, or DeepSeek adapter**, no login automation, and no coding-agent
-tool execution. Only `mock/echo` is exposed as a model.
+**Early Python foundation for a provider-independent AI bridge.** v0.3
+adds read-only browser UI diagnostics and an experimental, fixture-verified DOM
+chat adapter. There is still **no live ChatGPT, Claude, or DeepSeek adapter**,
+no login automation, and no coding-agent tool execution. Only `mock/echo` is
+registered in the HTTP service. The `fixture/ui` model is usable through the
+local `browser ui-test` command, not as a public AI model.
 
 ## What is implemented
 
@@ -20,6 +22,11 @@ tool execution. Only `mock/echo` is exposed as a model.
 - Browser discovery, explicit `--browser-path`, persistent backend selection, and one-time interactive sign-in in an OpenAgent-owned browser profile.
 - Browser disconnection detection, explicit restart, and deterministic fixture
   tests for lifecycle and failures.
+- **v0.3 DOM adapter:** configured selectors, read-only status diagnostics,
+  ordered JSON message envelopes, explicit completion evidence, one submission
+  per request, cancellation cleanup, and safe uncertain-outcome errors.
+- A local, account-free HTML chat fixture and `browser diagnose`/`browser ui-test`
+  commands. These do not connect to ChatGPT or other external AI providers.
 - Windows-friendly port behavior: default `12321`, configurable with
   `OPENAGENT_PORT` or `--port`; if unavailable, try the following 30 ports.
 
@@ -150,6 +157,46 @@ async with BrowserManager(config) as browser:
 
 `open_tab()` does **not** submit prompts. A failed or disconnected request is
 not retried automatically, because its remote completion state may be unknown.
+
+## v0.3 — test the browser UI adapter locally
+
+This exercises the browser UI adapter on a **local test webpage**, not a paid AI
+service or a live provider. You do not need another Playwright browser download;
+your selected `F:\Browsers\chrome-win64` remains the default.
+
+In **PowerShell terminal A**, serve the fixture from the OpenAgent repository:
+
+```powershell
+.\.venv\Scripts\python.exe -m http.server 8999 --bind 127.0.0.1 --directory examples
+```
+
+In **PowerShell terminal B**:
+
+```powershell
+# Read-only status inspection: {"state":"ready", ...}
+.\.venv\Scripts\python.exe -m openagent.cli browser diagnose --url http://127.0.0.1:8999/chat_fixture.html
+
+# Send one structured prompt to the local mock page, then read its finished answer
+.\.venv\Scripts\python.exe -m openagent.cli browser ui-test --message "Hello from Windows"
+
+# Optional: watch the interaction in your selected visible Chromium browser
+.\.venv\Scripts\python.exe -m openagent.cli browser ui-test --headful --message "test UI"
+```
+
+Expected final line looks like:
+`Fixture received 1 message(s); last user: Hello from Windows`.
+Press Ctrl+C in terminal A to stop the fixture server.
+
+`browser diagnose` supports `--composer`, `--send-button`, `--assistant-message`,
+`--login-selector`, `--challenge-selector`, `--rate-selector` and
+`--busy-selector` to inspect a separately reviewed site's UI. The status is
+*only observed visual evidence*, not confirmation of account authentication.
+`browser ui-test` refuses non-loopback URLs to prevent accidental prompt
+submission to a public website. The external provider capability list remains
+unknown until a real, permitted adapter and a live compatibility test exist.
+
+See [docs/browser-ui-adapter.md](docs/browser-ui-adapter.md) for the state
+machine, limitations and integration checklist.
 
 ## Port configuration
 

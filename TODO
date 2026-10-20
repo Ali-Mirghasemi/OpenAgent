@@ -36,13 +36,19 @@ Check off only work covered by tests or a documented manual verification.
 - [ ] Run `browser probe` in headed and CDP modes on user's Windows machine.
 - [ ] Confirm Python 3.10 install and v0.2 full test suite on Windows.
 
-## v0.3 — First authorized model adapter
-- [ ] Define a typed browser provider contract and error codes.
-- [ ] Implement fixture-based chat response completion/cancellation detection.
-- [ ] Implement provider capability discovery (model, effort, projects, files).
-- [ ] Define first-provider permission and terms review before live integration.
-- [ ] Add prompt/response transfer preserving context and request IDs.
-- [ ] Add native tool-call translation for OpenCode compatibility.
+## v0.3.0 — Browser UI adapter foundation
+- [x] Define a typed declarative browser site profile with error codes.
+- [x] Implement DOM state inspection: ready, login, challenge, rate limit, busy, changed, disconnected.
+- [x] Add local HTML fixture and CLI read-only `browser diagnose` command.
+- [x] Implement fixture chat: preserved ordered message roles, new-answer baseline,
+      explicit completion evidence, one submission, cancellation and cleanup.
+- [x] Prevent stale complete indicators from ending the turn prematurely.
+- [x] Add `browser ui-test` restricted to loopback HTTP and optional real Chromium DOM test.
+- [ ] Verify fixture demo with custom Chromium on Windows (user validation).
+- [ ] Register an authorized real provider and verify its individual capabilities.
+- [ ] Implement per-model discovery (effort levels, projects, files) when provider supports it.
+- [ ] Add request ID binding across upstream conversation identifiers.
+- [ ] Add prompt-mediated tool-call translation for OpenCode compatibility.
 - [ ] Add fixture tests for upload/download, checksums and safe paths.
 
 ## Later — client interoperability and agent runtime
