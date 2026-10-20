@@ -123,7 +123,7 @@ class BrowserUIProvider(Provider):
 
             s = self.site.selectors
             # Anchor to a newly created assistant message, never a previous turn.
-            baseline = await page.locator(s.assistant_message).count()
+            baseline = await self._capture_baseline(page)
             # A completed-turn marker might belong to a prior message. Record
             # whether it was absent *before* this turn was submitted.
             done_was_absent = bool(s.response_complete and not await page.locator(s.response_complete).first.is_visible())
@@ -151,6 +151,10 @@ class BrowserUIProvider(Provider):
         finally:
             if page is not None:
                 await self.browser.close_tab(tab_id)
+
+    async def _capture_baseline(self, page: Any) -> Any:
+        """Provider hook; generic websites can use conservative node counts."""
+        return await page.locator(self.site.selectors.assistant_message).count()
 
     async def _wait_for_send_ready(self, page: Any) -> Any:
         """Wait briefly for a clickable send control, but NEVER submit here.

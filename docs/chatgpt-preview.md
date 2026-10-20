@@ -118,3 +118,12 @@ This does not verify account authentication: anonymous/localized UIs may show
 editors too. Login/challenge/rate-limit markers retain priority. The read-only
 status check never sends text. Actual submission requires an enabled and visible
 Send button after composing; it fails safely without clicking otherwise.
+
+## DOM turn identity (v0.4.7)
+
+A virtualized ChatGPT-shaped UI may replace one mounted answer node with
+another without increasing the count. The adapter now prefers explicit
+`data-turn-id` or `data-message-id` values, and ties completion signals to
+the newly detected turn. If neither identity nor count growth can prove a
+new turn appeared, the request times out; it does not accept stale content.
+See [turn-identity.md](turn-identity.md) for tested behavior and limitations.

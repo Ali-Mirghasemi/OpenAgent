@@ -1,3 +1,15 @@
+## 0.4.7 — 2026-10-20
+- User confirmed OpenAgent v0.4.6 on Windows: 106 tests passed and authenticated
+  ChatGPT page reports `ready` with an inactive Send button (read-only).
+- Reworked ChatGPT answer anchoring to track optional logical DOM turn IDs
+  and handle a virtualized replacement even without an increased message count.
+- Added a conservative count fallback: if a replacement cannot be identified
+  reliably, timeout rather than accept a possibly stale response.
+- Completion evidence remains scoped to the new answer; old Copy controls do
+  not count, and pending/Stop indicators block premature return.
+- Added six unit tests and two optional real Chromium HTML-fixture tests.
+- Added docs/turn-identity.md. No production ChatGPT submission was tested.
+
 ## 0.4.6 — 2026-10-20
 - Windows report: 22 ChatGPT-domain Firefox cookies imported; operator confirms
   login, while status returned ui_changed because Send was hidden on an idle page.

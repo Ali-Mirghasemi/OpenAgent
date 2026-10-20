@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Virtualized Chat UI fixture</title></head><body>
+<main id="history"><article data-turn-id="old-turn"><div data-message-author-role="assistant"><div class="markdown">Old answer</div></div><button data-testid="copy-turn-action-button">Copy old</button></article></main>
+<div id="prompt-textarea" role="textbox" contenteditable="true" aria-label="Message"></div>
+<button data-testid="send-button">Send</button>
+<button data-testid="stop-button" hidden>Stop</button>
+<script>
+  const stop=document.querySelector('[data-testid="stop-button"]');
+  document.querySelector('[data-testid="send-button"]').addEventListener('click',()=>{
+    // Simulate an app that virtualizes/remounts history with a CONSTANT count.
+    const article=document.createElement('article');
+    article.setAttribute('data-turn-id','new-turn');
+    const msg=document.createElement('div');
+    msg.setAttribute('data-message-author-role','assistant');
+    const markdown=document.createElement('div'); markdown.className='markdown';
+    markdown.textContent='Incomplete';
+    const pending=document.createElement('span'); pending.setAttribute('aria-busy','true');
+    const copy=document.createElement('button'); copy.dataset.testid='copy-turn-action-button'; copy.textContent='Copy';
+    msg.append(markdown,pending); article.append(msg,copy);
+    document.querySelector('#history').replaceChildren(article);
+    stop.hidden=false;
+    setTimeout(()=>{markdown.textContent='Completed virtualized answer';pending.remove();stop.hidden=true;},100);
+  },{once:true});
+</script></body></html>

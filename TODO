@@ -1,9 +1,23 @@
+## v0.4.7 — Turn-scoped DOM identity
+- [x] Detect a new assistant answer despite unchanged mounted DOM message count,
+      when a stable logical turn ID is available.
+- [x] Retain conservative message-count fallback for sites without stable IDs.
+- [x] Reject ambiguous same-count replacements when no turn identity is available.
+- [x] Reset text-completion observations if the selected turn changes or disappears.
+- [x] Add synthetic Chromium virtualization and fail-closed timeout fixtures.
+- [x] Confirm v0.4.6 authenticated idle readiness on Windows (106 tests passed;
+      state=ready, evidence=composer_visible_send_inactive).
+- [ ] Verify turn IDs and completion markers against a permitted live provider.
+- [ ] Add persistent upstream conversation IDs and per-turn request binding.
+- [ ] Implement provider-native context continuation and file handling only
+      after the provider capabilities are verified.
+
 ## v0.4.6 — Authenticated idle composer
 - [x] Account for ChatGPT hiding Send before text is entered.
 - [x] Wait for visible/enabled Send after filling, without automatic retry.
 - [x] Preserve login-required priority over composer visibility.
 - [x] Add deterministic browser fixture with a dynamically appearing Send control.
-- [ ] Verify read-only `chatgpt-status --details` on imported session under Windows.
+- [x] Verify read-only `chatgpt-status --details` on imported session under Windows.
 - [ ] Verify real Send-control selectors only where UI automation is permitted.
 - [ ] Verify Ctrl+C subprocess cleanup in a Windows terminal.
 
@@ -121,7 +135,7 @@ Check off only work covered by tests or a documented manual verification.
 - [x] Add fake UI tests and real Chromium test using only injected HTML.
 - [x] Allow the optional Windows DOM test to use the saved portable Chromium executable.
 - [ ] Validate actual ChatGPT public UI selectors with the current permitted account.
-- [ ] Improve robust turn identity / DOM virtualization handling.
+- [x] Improve robust turn identity / DOM virtualization handling (fixture verified).
 - [ ] Verify if selected browser can use supported sign-in without a security challenge.
 - [ ] Add reliable native tool-call translation, real streaming, project operations,
       controlled file transfer, and explicit model / reasoning controls.

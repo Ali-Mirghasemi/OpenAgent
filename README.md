@@ -1,3 +1,26 @@
+## v0.4.7: DOM turn-identity reliability
+
+This update improves ChatGPT-shaped browser fixture handling when a site
+virtualizes history. The adapter now snapshots stable turn IDs before a
+submission, so it can distinguish a new answer even when the number of
+mounted messages stays the same. If the site replaces messages without
+exposing stable IDs, OpenAgent fails closed instead of treating old Copy
+buttons as proof of a completed response.
+
+Your v0.4.6 Windows check already confirmed that the imported-session page
+reports `ready` with the evidence `composer_visible_send_inactive`. **This is
+readiness evidence only**, not verification of production prompt submission.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,browser]"
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful --details
+```
+
+The optional new Chromium tests use local HTML fixtures and a temporary
+profile; they never access your signed-in session or a real provider service.
+See [turn identity](docs/turn-identity.md) for guarantees and limitations.
+
 # OpenAgent Bridge — v0.4.5
 
 **Early Python foundation for a provider-independent AI bridge.** The v0.4.x

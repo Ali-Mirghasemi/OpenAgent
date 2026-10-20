@@ -19,6 +19,7 @@ from ..browser.manager import BrowserManager
 from ..capabilities import Capabilities, Feature
 from ..models import Message, ProviderOutput
 from .browser_ui import BrowserSiteProfile, BrowserUIError, BrowserUIProvider
+from .turn_identity import TurnBaseline, find_new_turn, snapshot_turns
 
 CHATGPT_MODEL = "chatgpt-web/default"
 CHATGPT_URL = "https://chatgpt.com/"
@@ -119,13 +120,17 @@ class ChatGPTWebProvider(BrowserUIProvider):
             interruption=unknown, reasoning_levels=[],
         )
 
-    async def _wait_for_answer(self, page: Any, baseline: int,
+    async def _capture_baseline(self, page: Any) -> TurnBaseline:
+        return await snapshot_turns(page, self.site.selectors.assistant_message)
+
+    async def _wait_for_answer(self, page: Any, baseline: TurnBaseline,
                                done_was_absent: bool) -> str:
         """Require new assistant text AND per-turn completion, not idle time."""
         del done_was_absent  # global copy buttons can belong to *old* turns
         deadline = time.monotonic() + self.site.timeout_s
         previous = None
         stable = 0
+        active_key: str | None = None
         while time.monotonic() < deadline:
             state = await inspect_ui(page, self.site.selectors)
             if state.state in (
@@ -134,12 +139,15 @@ class ChatGPTWebProvider(BrowserUIProvider):
             ):
                 raise BrowserUIError(state.state, "ChatGPT UI is not available: " + state.state)
 
-            turns = page.locator(self.site.selectors.assistant_message)
-            count = await turns.count()
-            if count > baseline:
-                new_turn = turns.nth(count - 1)
-                # Check only the newly anchored turn. The article may own the
-                # copy control as a sibling of the markdown body.
+            found = await find_new_turn(page, self.site.selectors.assistant_message, baseline)
+            if found is not None:
+                new_turn, ident = found
+                # Pin text stability to one particular new answer. A changed
+                # logical ID must reset the timer, not inherit an old answer's
+                # stable observations.
+                candidate_key = "id:" + ident if ident else "count-fallback"
+                if candidate_key != active_key:
+                    active_key, previous, stable = candidate_key, None, 0
                 article = new_turn.locator("xpath=ancestor::article[1]")
                 scope = article if await article.count() else new_turn
                 copy_ready = await scope.locator(TURN_COPY_BUTTON).first.is_visible()
@@ -154,6 +162,11 @@ class ChatGPTWebProvider(BrowserUIProvider):
                     previous, stable = text, 1 if text else 0
                 if stable >= self.site.stable_observations and copy_ready and not (pending or rendering):
                     return text
+            else:
+                # A previously detected turn could be temporarily virtualized.
+                # Do not return a response until its visible completion remains
+                # established on the current DOM.
+                active_key, previous, stable = None, None, 0
             await asyncio.sleep(self.site.poll_s)
         raise BrowserUIError(
             "generation_timeout",

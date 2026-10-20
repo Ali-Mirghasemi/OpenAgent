@@ -98,3 +98,45 @@ async def test_logged_in_idle_page_send_appears_only_after_typing_real_chromium(
         await browser.close_tab('idle')
         output = await provider.complete(CHATGPT_MODEL, [Message(role='user', content='hello')])
         assert output.content == 'Response from idle composer fixture'
+
+
+@pytest.mark.asyncio
+async def test_virtualized_answer_with_same_message_count_real_chromium(tmp_path):
+    executable = find_chromium_executable()
+    if not executable:
+        pytest.skip('No installed Chromium for optional DOM test')
+    try:
+        import playwright  # noqa: F401
+    except ImportError:
+        pytest.skip('Playwright not installed')
+    html = (Path(__file__).parents[1] / 'examples' / 'chatgpt_virtualized_fixture.html').read_text(encoding='utf-8')
+    backend = LocalContentBackend(executable, html)
+    browser = BrowserManager(BrowserConfig(profile_dir=tmp_path/'virtual'), backend=backend)
+    provider = ChatGPTWebProvider(browser, timeout_s=2, poll_s=.04,
+                                  stable_observations=3, url='http://127.0.0.1:8999/virtualized.html')
+    async with browser:
+        output = await provider.complete(CHATGPT_MODEL, [Message(role='user', content='hello')])
+        assert output.content == 'Completed virtualized answer'
+        assert browser.status().open_tabs == 0
+
+
+@pytest.mark.asyncio
+async def test_virtualized_answer_without_ids_fails_closed_real_chromium(tmp_path):
+    executable = find_chromium_executable()
+    if not executable:
+        pytest.skip('No installed Chromium for optional DOM test')
+    try:
+        import playwright  # noqa: F401
+    except ImportError:
+        pytest.skip('Playwright not installed')
+    from openagent.providers.browser_ui import BrowserUIError
+    html = (Path(__file__).parents[1] / 'examples' / 'chatgpt_virtualized_no_ids_fixture.html').read_text(encoding='utf-8')
+    backend = LocalContentBackend(executable, html)
+    browser = BrowserManager(BrowserConfig(profile_dir=tmp_path/'noids'), backend=backend)
+    provider = ChatGPTWebProvider(browser, timeout_s=1.0, poll_s=.04,
+                                  stable_observations=3, url='http://127.0.0.1:8999/noids.html')
+    async with browser:
+        with pytest.raises(BrowserUIError) as exc:
+            await provider.complete(CHATGPT_MODEL, [Message(role='user', content='hello')])
+        assert exc.value.code == 'generation_timeout'
+        assert browser.status().open_tabs == 0

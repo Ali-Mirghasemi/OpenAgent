@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Unidentifiable chat UI fixture</title></head><body>
+<main id="history"><article><div data-message-author-role="assistant"><div class="markdown">Old answer</div></div><button data-testid="copy-turn-action-button">Copy old</button></article></main>
+<textarea id="prompt-textarea"></textarea>
+<button data-testid="send-button">Send</button>
+<button data-testid="stop-button" hidden>Stop</button>
+<script>
+  document.querySelector('[data-testid="send-button"]').addEventListener('click',()=>{
+    const article=document.createElement('article');
+    const msg=document.createElement('div'); msg.setAttribute('data-message-author-role','assistant');
+    const markdown=document.createElement('div'); markdown.className='markdown'; markdown.textContent='Looks complete but is unidentifiable';
+    const copy=document.createElement('button'); copy.dataset.testid='copy-turn-action-button'; copy.textContent='Copy';
+    msg.append(markdown); article.append(msg,copy);
+    // No stable ID and no increase in assistant count: FAIL CLOSED.
+    document.querySelector('#history').replaceChildren(article);
+  },{once:true});
+</script></body></html>

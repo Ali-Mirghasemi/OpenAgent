@@ -127,3 +127,12 @@ live automation. Never execute model instructions inside the bridge.
   markers take priority; this is never proof of authentication.
 - Submission requires a separate post-fill check for visible/enabled Send;
   no remote request is submitted if that check fails.
+
+## v0.4.7 browser-turn identity
+- An assistant DOM message count is not a durable conversation identity.
+- When available, capture bounded `data-turn-id` / `data-message-id` values
+  before submission and identify a newly mounted logical turn by unseen ID.
+- Retain count-increase fallback for UIs that lack reliable stable IDs;
+  a same-count replacement without IDs is ambiguous and must fail closed.
+- Require turn-scoped completion evidence, stable text and no pending marker.
+- No upstream conversation checkpoint/resume has been implemented by this update.
