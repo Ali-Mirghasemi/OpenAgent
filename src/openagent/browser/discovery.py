@@ -104,13 +104,14 @@ def discover_browsers(
     env = environ if environ is not None else os.environ
     home = home or Path.home()
     results: list[BrowserInstallation] = []
-    seen: set[tuple[str, str]] = set()
+    seen: set[str] = set()
 
     def add(kind: str, path: Path, source: str, *, bundled: bool = False) -> None:
         if not path.is_file():
             return
         resolved = str(path.resolve())
-        key = (kind, resolved.lower() if platform_name == "win32" else resolved)
+        # A portable chrome.exe can match both chrome and chromium; emit it once.
+        key = resolved.lower() if platform_name == "win32" else resolved
         if key in seen:
             return
         seen.add(key)
@@ -133,7 +134,9 @@ def discover_browsers(
                 ("firefox", "Mozilla Firefox/firefox.exe"),
             ):
                 add(kind, base / relative, "system")
-        if platform_name == sys.platform:
+        # Injected filesystem/environment roots are used by deterministic tests.
+        # Do not mix in the real machine Registry when scanning those roots.
+        if environ is None and platform_name == sys.platform:
             for kind, path in _registry_app_paths().items():
                 add(kind, path, "registry")
     elif platform_name == "darwin":

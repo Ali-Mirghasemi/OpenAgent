@@ -1,4 +1,4 @@
-# OpenAgent Bridge — v0.2.1
+# OpenAgent Bridge — v0.2.2
 
 **Early Python foundation for a provider-independent AI bridge.** The optional
 Playwright Browser Manager is now implemented. There is still **no live
@@ -49,7 +49,7 @@ The installed virtual environment can be used without activation. If you wish
 to activate it within PowerShell, use `.\.venv\Scripts\Activate.ps1`, **not**
 `source` or `activate.bat`. In Command Prompt use `.venv\Scripts\activate.bat`.
 
-## Discover and select browsers (new in v0.2.1)
+## Discover and select browsers (updated in v0.2.2)
 
 Use your existing downloaded Chromium build — **no new browser download**:
 
@@ -98,9 +98,28 @@ permission requirements still apply. The selected backend is persisted under
 `~/.openagent/browser.json` (non-secret browser type/path only).
 
 `browser open` uses the visible browser UI and waits for you to press Enter
-before closing and saving its profile. It does not automate login, copy
+before closing and retaining its profile. Press Ctrl+C **once** to request clean shutdown
+(exit code 130). Closing the window by itself does not finalize the CLI.
+On Windows the CLI polls console input asynchronously rather than leaving a
+background `input()` thread blocked during shutdown. It does not automate login, copy
 cookies, or access other browser profiles. The Browser Manager does not start
 when serving the current mock provider.
+
+### Google sign-in and interrupted downloads
+
+Google can deny account sign-in from a browser it identifies as being controlled
+by automation, even if that browser is a supported Firefox or Chrome build.
+OpenAgent does **not** bypass those restrictions, change automation fingerprints,
+or copy cookies from personal profiles. Sign in using a normal supported browser
+when Google refuses; for integrations requiring Google authentication, use a
+supported browser-based OAuth integration when available. An OpenAgent persistent
+profile retains a session only when the provider permits sign-in.
+
+A `403 AccessDenied` with "service is not available in your location" during
+`python -m playwright install chromium` is a CDN access restriction, not a Python
+installation failure. Your manually downloaded Chromium binary can still be
+used via `browser select chromium --browser-path ...`; you do not need the
+Playwright-managed Chromium download when that probe succeeds.
 
 For CDP, use a locally available Chrome/Edge debug endpoint:
 

@@ -70,3 +70,27 @@ def test_save_reload_selection_no_credentials(tmp_path):
 def test_missing_selection_defaults_to_chromium(tmp_path):
     assert load_selection(tmp_path / "missing.json")["browser"] == "chromium"
     assert profile_dir_for("firefox") != profile_dir_for("chromium")
+
+
+def test_simulated_windows_environment_skips_real_registry(tmp_path, monkeypatch):
+    """Regression: a Windows test must not discover the developer's real browsers."""
+    monkeypatch.setattr(browser_discovery, "_playwright_revisions", lambda: {})
+
+    def no_real_registry():
+        raise AssertionError("must not access the real Registry for synthetic paths")
+
+    monkeypatch.setattr(browser_discovery, "_registry_app_paths", no_real_registry)
+    found = discover_browsers(platform_name="win32", home=tmp_path,
+                              environ={"PROGRAMFILES": str(tmp_path / "not-installed")})
+    assert found == []
+
+
+def test_custom_chrome_executable_listed_once(tmp_path, monkeypatch):
+    monkeypatch.setattr(browser_discovery, "_playwright_revisions", lambda: {})
+    chrome = _touch(tmp_path / "portable" / "chrome-win64" / "chrome.exe")
+    found = discover_browsers(platform_name="win32", home=tmp_path,
+                              environ={}, extra_paths=[chrome.parent])
+    matches = [item for item in found if Path(item.executable) == chrome]
+    assert len(matches) == 1
+    assert matches[0].id == "chromium"
+    assert matches[0].usable

@@ -51,3 +51,19 @@ Discovery does not prove a browser can launch, detect website authentication,
 or validate a service's permission to automate it. Use `browser probe` to test
 startup; real providers will need separate end-to-end validation. The local
 HTTP bridge is still mock-only.
+
+## Troubleshooting Windows sign-in and Ctrl+C (v0.2.2)
+
+Google's account security checks may reject automated browsers with the message
+"This browser or app may not be secure." This is not fixed by choosing Firefox
+instead of Chromium, and does not indicate a corrupt OpenAgent profile. The
+application deliberately does not attempt to bypass Google sign-in restrictions.
+Use a normal browser or an authorized OAuth flow where available.
+
+`browser open` now uses nonblocking console polling; press Enter to finish or
+Ctrl+C once to cancel, allowing Playwright to close its owned context. Avoid
+repeated Ctrl+C presses while cleanup is running.
+
+`playwright install chromium` can fail with CDN 403 for geographic availability.
+A successful `browser probe` using `--browser-path` proves the custom executable
+can start without a second Chromium download.

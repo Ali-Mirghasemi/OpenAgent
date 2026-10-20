@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import json
 import os
+import sys
 from pathlib import Path
 from dataclasses import replace
 
@@ -43,6 +44,42 @@ def _browser_settings(args: argparse.Namespace):
     )
 
 
+async def _wait_for_manual_confirmation() -> bool:
+    """Read Enter without parking an input() thread across asyncio cancellation.
+
+    Windows console input cannot be polled with select(). Check msvcrt.kbhit
+    instead; the event loop remains free to service Playwright, and Ctrl+C
+    can cancel the coroutine so the browser context gets closed cleanly.
+    """
+    if not sys.stdin.isatty():
+        print("No interactive terminal detected; closing browser.", flush=True)
+        return False
+
+    if os.name == "nt":
+        import msvcrt
+
+        while True:
+            if msvcrt.kbhit():
+                key = msvcrt.getwch()
+                if key in ("\r", "\n"):
+                    print()
+                    return True
+                if key == "\x03":
+                    raise asyncio.CancelledError()
+                if key in ("\x00", "\xe0"):
+                    # Windows extended key prefix (arrows/function keys).
+                    msvcrt.getwch()
+            await asyncio.sleep(0.08)
+    else:
+        import select
+
+        while True:
+            readable, _, _ = select.select([sys.stdin], [], [], 0)
+            if readable:
+                return bool(sys.stdin.readline())
+            await asyncio.sleep(0.08)
+
+
 async def _open_browser(args: argparse.Namespace) -> int:
     """One-time interactive login via the selected dedicated browser profile."""
     from .browser import BrowserManager, BrowserError
@@ -55,13 +92,13 @@ async def _open_browser(args: argparse.Namespace) -> int:
         async with BrowserManager(config) as manager:
             await manager.open_tab("interactive-login", args.url)
             print(f"Browser: {config.browser}; profile: {config.profile_dir}")
-            print("Sign in normally in the opened browser. Press Enter here when finished.")
-            try:
-                await asyncio.to_thread(input)
-            except EOFError:
-                print("No interactive console; closing browser.")
-            # Closing the persistent context saves the browser-managed profile.
+            print("Use this browser normally. Press Enter to close, or Ctrl+C to cancel.", flush=True)
+            await _wait_for_manual_confirmation()
+            # Closing the persistent context retains the OpenAgent profile.
         return 0
+    except asyncio.CancelledError:
+        print("\nBrowser session cancelled; closing the owned browser.", flush=True)
+        return 130
     except (BrowserError, ValueError) as exc:
         print(f"Browser open failed: {exc}")
         return 1
@@ -170,7 +207,14 @@ def main() -> None:
         if args.browser_command == "select":
             raise SystemExit(_select_browser(args))
         if args.browser_command == "open":
-            raise SystemExit(asyncio.run(_open_browser(args)))
+            try:
+                code = asyncio.run(_open_browser(args))
+            except KeyboardInterrupt:
+                # First Ctrl+C cancels the main task; context cleanup runs
+                # before asyncio.run returns control to this handler.
+                print("\nBrowser session interrupted.", flush=True)
+                code = 130
+            raise SystemExit(code)
         raise SystemExit(asyncio.run(_probe_browser(args)))
 
     token = os.environ.get("OPENAGENT_API_TOKEN") or None

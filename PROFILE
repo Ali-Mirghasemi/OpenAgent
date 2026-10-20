@@ -30,6 +30,12 @@ and 9Router. A separate standalone coding agent is a later product layer.
 - Protect sessions, token material, browser profiles, downloaded artifacts and
   console diagnostics from accidental publication.
 
+## v0.2.2 implemented
+- Offline Windows simulated-environment isolation (no real Registry reads).
+- Portable Chrome/Chromium discovery deduplication by executable.
+- Interruptible console wait in `browser open` with clean owned-browser teardown.
+- Sign-in may be restricted by the website; discovery and launch do not imply acceptance.
+
 ## v0.2.1 implemented
 - Read-only installed/browser-cache discovery with optional portable path.
 - CLI `browser discover`, `browser select`, `browser probe`, `browser open`.

@@ -1,5 +1,16 @@
 # OpenAgent — Change Log
 
+## 0.2.2 — 2026-10-20
+- Fixed Windows discovery fixture isolation: when paths/environment are injected,
+  discovery no longer reads real system Registry installations.
+- Removed duplicate portable Chrome/Chromium candidate rows for one executable.
+- Replaced `asyncio.to_thread(input)` in interactive `browser open` with
+  cancellable nonblocking console polling; single Ctrl+C requests clean shutdown.
+- Added regression tests for simulated Windows discovery, interactive Enter,
+  Ctrl+C, and browser-context cleanup.
+- Documented Google's automated-browser login restriction and the Chromium
+  download CDN region error. Neither is bypassed by OpenAgent.
+
 ## 0.2.1 — 2026-10-20
 - Added read-only cross-platform system browser discovery and matching Playwright
   Chromium/Firefox cache detection with explicit portable-path scanning.

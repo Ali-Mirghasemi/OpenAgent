@@ -2,6 +2,15 @@
 
 Check off only work covered by tests or a documented manual verification.
 
+## v0.2.2 — Windows/browser follow-up
+- [x] Prevent synthetic Windows discovery tests from reading real Registry installations.
+- [x] Deduplicate a portable Chrome executable advertised as both Chrome and Chromium.
+- [x] Remove blocked input thread from interactive login; clean up on Ctrl+C.
+- [x] Add offline tests for keyboard cancellation and profile/browser cleanup.
+- [x] Document Google security restrictions without attempting evasion.
+- [ ] Verify `browser open` Enter and single Ctrl+C exits cleanly on Windows.
+- [ ] Verify whether a selected site's login is permitted in the chosen browser.
+
 ## v0.2.1 — Browser discovery and selection
 - [x] Offline discovery of standard Chrome, Edge, Firefox, and matching Playwright cache builds.
 - [x] Allow portable browser folder or executable via `--browser-path`.
@@ -10,8 +19,9 @@ Check off only work covered by tests or a documented manual verification.
 - [x] Provide explicit interactive `browser open` for one-time sign-in.
 - [x] Differentiate native Firefox installation from compatible Playwright Firefox.
 - [x] Test discovery and launch argument selection with offline fakes.
-- [ ] Verify manually downloaded Chromium on user's Windows machine.
-- [ ] Verify Playwright Firefox installation and profile persistence on Windows.
+- [x] Verify manually downloaded Chromium on user's Windows machine (probe succeeded).
+- [x] Verify Playwright Firefox installation and startup on Windows (probe succeeded).
+- [ ] Verify Firefox profile persistence for a site that permits automated-browser login.
 
 ## v0.2.0 — Browser Manager
 - [x] Separate a browser manager from service/model adapters.
