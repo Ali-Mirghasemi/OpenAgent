@@ -20,12 +20,21 @@ class PlaywrightBackend:
         self._playwright = await async_playwright().start()
         try:
             if config.mode == "persistent":
+                browser_type = (self._playwright.firefox if config.browser == "firefox"
+                                else self._playwright.chromium)
+                options: dict[str, Any] = {"headless": config.headless, "timeout": config.startup_timeout_ms}
+                if config.executable_path is not None:
+                    browser_executable = config.executable_path.expanduser().resolve()
+                    if not browser_executable.is_file():
+                        raise BrowserStartupError("selected browser executable does not exist")
+                    options["executable_path"] = str(browser_executable)
+                elif config.browser in ("chrome", "msedge"):
+                    options["channel"] = config.browser
+                elif config.channel:
+                    options["channel"] = config.channel
                 profile_dir = config.profile_dir.expanduser().resolve()
                 profile_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-                self._context = await self._playwright.chromium.launch_persistent_context(
-                    str(profile_dir), headless=config.headless,
-                    channel=config.channel, timeout=config.startup_timeout_ms,
-                )
+                self._context = await browser_type.launch_persistent_context(str(profile_dir), **options)
                 self._browser = self._context.browser
                 self._owned_context = True
             else:

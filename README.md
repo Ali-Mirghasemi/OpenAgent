@@ -1,4 +1,4 @@
-# OpenAgent Bridge — v0.2.0
+# OpenAgent Bridge — v0.2.1
 
 **Early Python foundation for a provider-independent AI bridge.** The optional
 Playwright Browser Manager is now implemented. There is still **no live
@@ -15,8 +15,9 @@ tool execution. Only `mock/echo` is exposed as a model.
   turns, and safe unknown-outcome handling (not automatic resubmission).
 - OAP/1 compact JSON tool-envelope validation; **the bridge never executes tools**.
 - **Browser Manager:** attach to local CDP or launch a dedicated Playwright
-  persistent Chromium profile; own only newly created request tabs, enforce
+  persistent profile (Chromium, installed Chrome/Edge, or Playwright Firefox); own only newly created request tabs, enforce
   per-provider origin restrictions, cap open tabs, and expose typed errors.
+- Browser discovery, explicit `--browser-path`, persistent backend selection, and one-time interactive sign-in in an OpenAgent-owned browser profile.
 - Browser disconnection detection, explicit restart, and deterministic fixture
   tests for lifecycle and failures.
 - Windows-friendly port behavior: default `12321`, configurable with
@@ -32,7 +33,8 @@ Open PowerShell in the directory containing `pyproject.toml`.
 py -3.10 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -e ".[dev,browser]"
-.\.venv\Scripts\python.exe -m playwright install chromium
+# Only if you do not already have a usable browser:
+# .\.venv\Scripts\python.exe -m playwright install chromium
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m openagent.cli serve
 ```
@@ -47,30 +49,67 @@ The installed virtual environment can be used without activation. If you wish
 to activate it within PowerShell, use `.\.venv\Scripts\Activate.ps1`, **not**
 `source` or `activate.bat`. In Command Prompt use `.venv\Scripts\activate.bat`.
 
-## Browser Manager probe
+## Discover and select browsers (new in v0.2.1)
 
-This diagnostic starts and stops a browser without navigating to any AI
-website or sending any prompt:
+Use your existing downloaded Chromium build — **no new browser download**:
 
 ```powershell
-# New dedicated browser profile, visible window
+# Your earlier environment variable pointed at chrome-win64, not a Playwright cache root.
+Remove-Item Env:PLAYWRIGHT_BROWSERS_PATH -ErrorAction SilentlyContinue
+
+# Find Chrome, Edge, Firefox, and installed Playwright browser builds.
+.\.venv\Scripts\python.exe -m openagent.cli browser discover
+
+# Inspect an arbitrary portable browser extraction directory.
+.\.venv\Scripts\python.exe -m openagent.cli browser discover --search-dir "F:\Browsers\chrome-win64"
+
+# Set the browser default for future probes and provider adapters.
+.\.venv\Scripts\python.exe -m openagent.cli browser select chromium --browser-path "F:\Browsers\chrome-win64"
+
+# Test it without navigating to a website.
 .\.venv\Scripts\python.exe -m openagent.cli browser probe --headful
 
-# Default headless diagnostic
-.\.venv\Scripts\python.exe -m openagent.cli browser probe
+# Open a site ONCE in the dedicated OpenAgent profile to sign in manually.
+.\.venv\Scripts\python.exe -m openagent.cli browser open --url https://example.com
+```
 
-# Attach to Chrome already started with a LOCAL remote-debugging endpoint
+You can override a saved preference for one probe:
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser probe --browser chrome --headful
+.\.venv\Scripts\python.exe -m openagent.cli browser probe --browser msedge --headful
+.\.venv\Scripts\python.exe -m openagent.cli browser probe --browser chromium --browser-path "F:\Browsers\chrome-win64" --headful
+```
+
+Firefox support requires the **Playwright-patched Firefox build**; normal desktop
+Firefox can be discovered but is not a drop-in Playwright executable:
+
+```powershell
+.\.venv\Scripts\python.exe -m playwright install firefox
+.\.venv\Scripts\python.exe -m openagent.cli browser select firefox
+.\.venv\Scripts\python.exe -m openagent.cli browser probe --headful
+```
+
+Browser selection does NOT automatically reuse a login from Chrome/Firefox's
+normal personal profile. OpenAgent uses a dedicated **persistent profile per
+browser type**; sign in once through `browser open` and that browser's session
+may be available to later OpenAgent runs. Logins can expire, and provider
+permission requirements still apply. The selected backend is persisted under
+`~/.openagent/browser.json` (non-secret browser type/path only).
+
+`browser open` uses the visible browser UI and waits for you to press Enter
+before closing and saving its profile. It does not automate login, copy
+cookies, or access other browser profiles. The Browser Manager does not start
+when serving the current mock provider.
+
+For CDP, use a locally available Chrome/Edge debug endpoint:
+
+```powershell
 .\.venv\Scripts\python.exe -m openagent.cli browser probe --mode cdp --cdp-url http://127.0.0.1:9222
 ```
 
-Chrome requires a non-default user-data directory to enable CDP in recent
-versions. The manager also forbids using the normal Chrome/Edge `User Data`
-directory as its persistent profile. A fresh OpenAgent profile will not
-already be logged in; user authentication, where allowed by the provider,
-will be introduced with a real provider adapter later.
-
-The Playwright transport isn't automatically started when the mock HTTP bridge
-starts. This is intentional: the mock has no browser dependency.
+See [docs/browser-discovery.md](docs/browser-discovery.md) for installation
+paths, Firefox limits, and when a browser can reuse its existing login state.
 
 ### Python interface for future adapters
 

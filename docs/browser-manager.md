@@ -1,4 +1,4 @@
-# Browser Manager v0.2 — transport contract
+# Browser Manager v0.2.1 — transport contract
 
 This module owns browser connections and OpenAgent-created pages only. It is **not**
 a ChatGPT adapter, an authentication extractor, or an autonomous agent.
@@ -17,10 +17,12 @@ a ChatGPT adapter, an authentication extractor, or an autonomous agent.
 
 ## Browser modes
 
-`persistent`: `chromium.launch_persistent_context()` with a dedicated profile,
+`persistent`: `chromium` or `firefox` `launch_persistent_context()` with a dedicated profile,
 controlled by OpenAgent. Headless by default. User can explicitly run a visible
-browser with `--headful`. The normal Chrome/Edge User Data location is not a
-supported automation profile.
+browser with `--headful`. Installed Chrome and Edge can use Playwright channels, and
+`--browser-path` can point to an external Chromium-family binary. The normal
+Chrome/Edge User Data location is not a supported automation profile.
+Each browser type gets a distinct profile; a manual sign-in there can persist.
 
 `cdp`: `chromium.connect_over_cdp()` to a **local** HTTP or WS endpoint. Uses
 an existing browser context and creates its own tabs. It never closes the
@@ -67,3 +69,25 @@ ownership, especially CDP not closing the existing context.
 Manual Playwright `browser probe`: optional end-to-end browser startup and
 shutdown. A successful probe does not establish compatibility with ChatGPT or
 any other provider. Provider-specific tests belong in the next milestone.
+
+## Browser discovery and user selection (v0.2.1)
+
+`openagent browser discover` performs read-only executable discovery from
+standard system install locations, Windows App Paths registry, PATH, and
+matching Playwright revision cache locations. `--search-dir` explicitly adds a
+portable download location; no whole-disk crawl occurs.
+
+`openagent browser select <chromium|chrome|msedge|firefox>` stores a default
+browser type and optional executable path in `~/.openagent/browser.json`.
+A saved selection is used by `browser probe` and `browser open` unless overridden.
+The current `serve` command still only registers the mock provider.
+
+A normal Firefox executable may be listed but is *not* automatically usable
+through Playwright: it requires an instrumented Playwright Firefox build.
+Firefox also does not use Chromium's CDP attachment path. Selecting it uses a
+separate persistent OpenAgent profile, not the running user's Firefox login.
+
+`browser open --url https://...` navigates by explicit user request and holds
+a headed browser session until Enter. This is one-time interactive sign-in,
+not automated login, token extraction or profile import. Credentials are
+managed by the browser and never written to OpenAgent configuration.

@@ -1,5 +1,17 @@
 # OpenAgent — Change Log
 
+## 0.2.1 — 2026-10-20
+- Added read-only cross-platform system browser discovery and matching Playwright
+  Chromium/Firefox cache detection with explicit portable-path scanning.
+- Added `browser select`, persisted backend choice, and `--browser-path` folder/exe
+  support for a manually downloaded Chromium, Chrome or Edge executable.
+- Added backend selection for Playwright Firefox with isolated persistent profile.
+- Added `browser open --url` for user-driven one-time login in a reusable profile.
+- Documented that ordinary Firefox and its existing logged-in personal profile
+  cannot automatically be reused by Playwright, and CDP is Chromium-only.
+- Added offline Windows discovery/selection/backend tests.
+- Centralized API version from package version to prevent drift.
+
 ## 0.2.0 — 2026-10-18
 - Added optional Playwright Browser Manager and separate backend implementation.
 - Supports `persistent` (dedicated profile) and `cdp` (local existing browser)

@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from . import __version__
 from .models import CompletionRequest, Message, SessionCreate, SessionTurn
 from .registry import Registry
 from .store import SessionBusy, SessionNotFound, SessionStore
@@ -51,7 +52,7 @@ def sse_completion(model: str, output: Any, request_id: str):
 
 
 def create_app(registry: Registry, store: SessionStore, *, api_token: str | None = None) -> FastAPI:
-    app = FastAPI(title="OpenAgent Bridge", version="0.2.0")
+    app = FastAPI(title="OpenAgent Bridge", version=__version__)
 
     @app.middleware("http")
     async def authorize(request: Request, call_next):
@@ -63,7 +64,7 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "service": "openagent-bridge", "version": "0.2.0"}
+        return {"status": "ok", "service": "openagent-bridge", "version": __version__}
 
     @app.get("/v1/models")
     async def models():

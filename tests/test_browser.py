@@ -137,6 +137,10 @@ def test_bad_settings_rejected(tmp_path):
         BrowserConfig(profile_dir=tmp_path / "Default")
     with pytest.raises(ValueError, match="dedicated"):
         BrowserConfig(profile_dir=tmp_path / "Google" / "Chrome" / "User Data")
+    with pytest.raises(ValueError, match="Firefox cannot attach"):
+        BrowserConfig(mode="cdp", browser="firefox")
+    with pytest.raises(ValueError, match="choose executable_path or channel"):
+        BrowserConfig(channel="chrome", executable_path=tmp_path / "chrome.exe")
     with pytest.raises(ValueError, match="max_tabs"):
         BrowserConfig(profile_dir=tmp_path / "agent", max_tabs=0)
     with pytest.raises(ValueError, match="allowed_origins"):

@@ -40,12 +40,22 @@ class BrowserConfig:
     cdp_url: str = "http://127.0.0.1:9222"
     headless: bool = True
     channel: str | None = None
+    browser: Literal["chromium", "chrome", "msedge", "firefox"] = "chromium"
+    executable_path: Path | None = None
     startup_timeout_ms: int = 30_000
     navigation_timeout_ms: int = 30_000
     max_tabs: int = 4
     allowed_origins: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if self.browser not in ("chromium", "chrome", "msedge", "firefox"):
+            raise ValueError("invalid browser type")
+        if self.mode == "cdp" and self.browser == "firefox":
+            raise ValueError("Firefox cannot attach via Chromium CDP; use persistent mode")
+        if self.executable_path is not None and self.channel:
+            raise ValueError("choose executable_path or channel, not both")
+        if self.browser == "firefox" and self.channel:
+            raise ValueError("channel is not supported for Firefox")
         if self.mode not in ("persistent", "cdp"):
             raise ValueError("invalid browser mode")
         if not (100 <= self.startup_timeout_ms <= 300_000):
@@ -161,7 +171,11 @@ class BrowserManager:
                     await self._backend.stop()
                 except Exception:
                     pass
-                raise BrowserStartupError("browser startup failed; check Playwright/Chromium installation or the local CDP endpoint") from exc
+                # Backend-raised BrowserStartupError messages are intentionally
+                # sanitized. Other driver exceptions may contain private paths.
+                message = (str(exc) if isinstance(exc, BrowserStartupError)
+                           else "browser startup failed; verify browser compatibility/path or the local CDP endpoint")
+                raise BrowserStartupError(message) from exc
             self._state = "running"
             return self.status()
 

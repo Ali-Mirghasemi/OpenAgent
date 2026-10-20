@@ -35,8 +35,10 @@ class FakeBrowser:
 class FakeChromium:
     def __init__(self, context):
         self.ctx = context
+        self.launch_calls = []
 
     async def launch_persistent_context(self, *_args, **_kwargs):
+        self.launch_calls.append((_args, _kwargs))
         return self.ctx
 
     async def connect_over_cdp(self, *_args, **_kwargs):
@@ -46,6 +48,7 @@ class FakeChromium:
 class FakePlaywright:
     def __init__(self, context):
         self.chromium = FakeChromium(context)
+        self.firefox = FakeChromium(context)
         self.stopped = False
 
     async def stop(self):
@@ -92,3 +95,41 @@ async def test_cdp_mode_does_not_close_existing_context(monkeypatch):
     await b.stop()
     assert not ctx.closed  # Browser belongs to the existing user session.
     assert pw.stopped
+
+
+@pytest.mark.asyncio
+async def test_select_firefox_backend_without_chromium(tmp_path, monkeypatch):
+    ctx = FakeContext()
+    pw = install_fake(monkeypatch, ctx)
+    backend = PlaywrightBackend()
+    await backend.start(BrowserConfig(browser="firefox", profile_dir=tmp_path / "firefox-agent"))
+    assert len(pw.firefox.launch_calls) == 1
+    assert len(pw.chromium.launch_calls) == 0
+    _, kwargs = pw.firefox.launch_calls[0]
+    assert "channel" not in kwargs
+    await backend.stop()
+
+
+@pytest.mark.asyncio
+async def test_custom_chromium_executable_path(tmp_path, monkeypatch):
+    exe = tmp_path / "chrome.exe"
+    exe.write_bytes(b"fake")
+    ctx = FakeContext()
+    pw = install_fake(monkeypatch, ctx)
+    backend = PlaywrightBackend()
+    await backend.start(BrowserConfig(browser="chromium", executable_path=exe, profile_dir=tmp_path / "profile"))
+    _, kwargs = pw.chromium.launch_calls[0]
+    assert kwargs["executable_path"] == str(exe)
+    assert "channel" not in kwargs
+    await backend.stop()
+
+
+@pytest.mark.asyncio
+async def test_edge_uses_channel(tmp_path, monkeypatch):
+    ctx = FakeContext()
+    pw = install_fake(monkeypatch, ctx)
+    backend = PlaywrightBackend()
+    await backend.start(BrowserConfig(browser="msedge", profile_dir=tmp_path / "edge-profile"))
+    _, kwargs = pw.chromium.launch_calls[0]
+    assert kwargs["channel"] == "msedge"
+    await backend.stop()

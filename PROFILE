@@ -7,7 +7,8 @@ and 9Router. A separate standalone coding agent is a later product layer.
 ## Technology
 - Python >=3.10; FastAPI; Pydantic v2; SQLite; pytest/pytest-asyncio.
 - Browser transport: optional Playwright package, persistent Chromium profile
-  or localhost-only CDP connection.
+  or localhost-only CDP connection; Chrome/Edge launch channels and the
+  Playwright Firefox engine are available in persistent mode.
 - Versioned compact tool protocol: OAP/1 (validation only).
 - Loopback API default: 127.0.0.1:12321; port fallback for Windows reservations.
 
@@ -28,6 +29,13 @@ and 9Router. A separate standalone coding agent is a later product layer.
 - Keep TODO, PROFILE, CHANGES, README and docs aligned with code.
 - Protect sessions, token material, browser profiles, downloaded artifacts and
   console diagnostics from accidental publication.
+
+## v0.2.1 implemented
+- Read-only installed/browser-cache discovery with optional portable path.
+- CLI `browser discover`, `browser select`, `browser probe`, `browser open`.
+- Persistent per-browser OpenAgent profiles; no import of personal cookies.
+- Firefox requires the Playwright version, not stock Firefox; CDP only Chromium.
+- Stored preference `~/.openagent/browser.json` includes no authentication data.
 
 ## v0.2.0 implemented
 - Mock provider only; OpenAI Chat Completions subset and local sessions.
