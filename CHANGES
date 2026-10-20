@@ -1,5 +1,16 @@
 # OpenAgent — Change Log
 
+## 0.4.5 — 2026-10-20
+- Fixed Firefox cookie migration failing with Playwright's `Cookie should have a
+  valid expires` error when Firefox stores extremely distant future expiries.
+- Cap only oversized future expiry timestamps to Playwright's year-9999 maximum
+  (253402300799 seconds); invalid/expired values remain excluded.
+- Convert Playwright cookie-insertion exceptions into sanitized browser-session
+  errors so the CLI does not print driver tracebacks or authentication material.
+- Added SQLite regression tests for int64 expiry sentinels, browser-error tests,
+  and optional real-Chromium verification with synthetic cookies.
+- Login after import remains unverified; no password access or security bypass.
+
 ## 0.4.4 — 2026-10-20
 - Added read-only browser-profile discovery for Firefox (profiles.ini), Chrome,
   Edge, and existing OpenAgent-managed persistent profiles.

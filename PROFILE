@@ -114,3 +114,9 @@ live automation. Never execute model instructions inside the bridge.
 - Cookie import is not proof of login and never overrides a provider security
   challenge. Browser-specific account restrictions and terms still apply.
 - Directly launching an ordinary Firefox profile via Playwright remains unsupported.
+
+## v0.4.5 expiry interoperability
+- The allowlisted Firefox cookie importer clamps future expiry values beyond
+  Playwright/Chromium year-9999 limit, and skips invalid or expired values.
+- Errors from Playwright cookie insertion must not expose raw cookie data.
+- Regression tests must not read real browser profiles or sessions.

@@ -1,4 +1,4 @@
-# OpenAgent Bridge — v0.4.4
+# OpenAgent Bridge — v0.4.5
 
 **Early Python foundation for a provider-independent AI bridge.** The v0.4.x
 release includes an opt-in, experimental ChatGPT public-UI adapter, verified
@@ -6,6 +6,20 @@ with local fixtures but **not with a live ChatGPT account**. The API serves
 `mock/echo` by default; `chatgpt-web/default` appears only if explicitly
 enabled with `--enable-chatgpt-web` and a bearer token. No automated login,
 model control, native tools, or coding-agent command execution.
+
+## Fix in v0.4.5 — Firefox cookie expiry compatibility
+
+Firefox cookie databases may contain unusually distant expiry values, including
+an int64 maximum sentinel. Playwright rejects expiry timestamps beyond
+`253402300799` (end of year 9999). OpenAgent now caps only those too-large
+*future* expiries to Playwright's supported limit. Expired, invalid and
+non-finite expiry values are still discarded, without being made active.
+
+The importer now handles Playwright cookie errors without a traceback or
+revealing cookie data. **Importing cookies is not equivalent to signing in**;
+check the browser's status afterward. Use the exact Firefox profile path shown
+by `browser profiles --browser firefox`. Never paste cookies, secrets, or a
+raw Firefox cookie database into the chat.
 
 ## New in v0.4.4 — Discover existing profiles and optional Firefox session reuse
 

@@ -1,3 +1,12 @@
+## v0.4.5 — Firefox cookie expiry interoperability
+- [x] Normalize out-of-range future expiry timestamps for Playwright.
+- [x] Reject invalid and expired timestamps without extending their validity.
+- [x] Surface backend rejection as a sanitized error without cookie leakage.
+- [x] Add regression tests and optional synthetic Chromium verification.
+- [ ] Verify import on Windows with the chosen `default-release` profile.
+- [ ] Check destination login state without assuming import means authentication.
+- [ ] Verify Windows Ctrl+C teardown warnings are resolved in a real terminal.
+
 ## v0.4.4 — Profile discovery and opt-in local site-cookie migration
 - [x] Enumerate Firefox, Chrome and Edge profile locations without accessing secrets.
 - [x] Import only allowlisted site cookies from an explicitly chosen Firefox profile,

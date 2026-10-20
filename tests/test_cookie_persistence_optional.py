@@ -39,3 +39,21 @@ async def test_site_cookie_survives_managed_chromium_restart(tmp_path):
                        for c in cookies)
         finally:
             await context.close()
+
+
+@pytest.mark.asyncio
+async def test_portable_far_future_expiry_real_chromium(tmp_path):
+    """Optional test of the exact Firefox expiry error observed on Windows."""
+    path = find_chromium_executable()
+    if not path:
+        pytest.skip('No local Chromium executable')
+    from openagent.browser.firefox_session import _portable_expiry, _MAX_PLAYWRIGHT_EXPIRY
+    conf = BrowserConfig(profile_dir=tmp_path / 'disposable-large-expiry',
+                         executable_path=Path(path), headless=True)
+    async with BrowserManager(conf) as manager:
+        await manager.install_site_cookies('chatgpt.com', [{
+            'name': 'openagent_large_expiry_fixture', 'value': 'synthetic',
+            'domain': '.chatgpt.com', 'path': '/',
+            'expires': _portable_expiry(2**63 - 1, time.time()),
+            'secure': True, 'httpOnly': True, 'sameSite': 'Lax'
+        }])

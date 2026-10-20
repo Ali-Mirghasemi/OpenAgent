@@ -37,3 +37,17 @@ integration as a fallback.
 **Windows:** The source profile may be locked during use. If an import errors,
 close Firefox normally and retry. Do not copy or edit live profile databases.
 A short shutdown drain attempts to prevent Python 3.10 Proactor pipe warnings.
+
+## Firefox expiry compatibility (v0.4.5)
+
+Some Firefox databases contain cookie `expiry` values beyond what Playwright
+accepts (e.g. the SQLite signed-64-bit maximum). OpenAgent now caps those
+future expiry values at `253402300799` (9999-12-31 23:59:59 UTC) before
+calling `BrowserContext.add_cookies`. Expired cookies are never extended.
+
+A backend rejection returns a brief sanitized `Cookie import failed` message
+instead of the full Playwright stack trace. Authentication still requires a
+separate status check; an imported cookie does not guarantee a usable session.
+
+If a profile is named `xaghgvln.default-release`, use precisely that path. A
+shortened `.default` path is different and won't resolve to the selected profile.

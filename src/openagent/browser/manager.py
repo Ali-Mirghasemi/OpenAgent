@@ -225,7 +225,13 @@ class BrowserManager:
         for cookie in cookies:
             if cookie.get('domain') not in (site, '.' + site):
                 raise BrowserSessionError('cookie outside approved site scope')
-        await self._backend.add_cookies(cookies)
+        try:
+            await self._backend.add_cookies(cookies)
+        except Exception as exc:
+            # A Playwright protocol error can contain cookie metadata, or even
+            # secret data from the supplied payload. Do not expose the original
+            # exception through the normal CLI. Preserve it only as a cause.
+            raise BrowserSessionError('browser rejected site-cookie import') from exc
         return len(cookies)
 
     def tab(self, tab_id: str) -> BrowserPage:

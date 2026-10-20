@@ -10,9 +10,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from openagent.browser import BrowserConfig, BrowserManager
+from openagent.browser import BrowserConfig, BrowserManager, BrowserSessionError
 from openagent.browser.profiles import BrowserProfile, discover_profiles
-from openagent.browser.firefox_session import firefox_site_cookies, SessionImportError
+from openagent.browser.firefox_session import firefox_site_cookies, SessionImportError, _MAX_PLAYWRIGHT_EXPIRY, _portable_expiry
 from openagent import cli
 
 
@@ -84,6 +84,75 @@ def test_firefox_read_imports_only_site_scope_and_no_expired(tmp_path):
     assert {c['name'] for c in result} == {'session', 'host'}
     assert {c['value'] for c in result} == {'private-chatgpt-cookie', 'another-private-cookie'}
     assert result[0]['sameSite'] == 'Lax'
+
+
+def test_import_normalizes_far_future_firefox_expiries(tmp_path):
+    """Some real Firefox profiles use expiry values beyond Playwright's limit."""
+    ff = make_firefox_profile(tmp_path)
+    make_cookie_db(ff)
+    db = ff / 'cookies.sqlite'
+    with sqlite3.connect(str(db)) as conn:
+        conn.execute('UPDATE moz_cookies SET expiry=? WHERE name=?',
+                     (2**63 - 1, 'session'))
+        conn.execute('UPDATE moz_cookies SET expiry=? WHERE name=?',
+                     (_MAX_PLAYWRIGHT_EXPIRY + 10, 'host'))
+    result = firefox_site_cookies(ff, 'chatgpt.com')
+    assert len(result) == 2
+    assert {c['expires'] for c in result} == {_MAX_PLAYWRIGHT_EXPIRY}
+    assert all(isinstance(c['expires'], int) for c in result)
+
+
+def test_expiry_portability_rejects_invalid_or_expired():
+    now = time.time()
+    assert _portable_expiry(2**63 - 1, now) == _MAX_PLAYWRIGHT_EXPIRY
+    assert _portable_expiry(int(now) + 200, now) == int(now) + 200
+    for invalid in (0, -1, int(now) - 10, float('nan'), float('inf'),
+                    -float('inf'), 'bad', None, True):
+        assert _portable_expiry(invalid, now) is None
+
+
+@pytest.mark.asyncio
+async def test_backend_cookie_failure_is_sanitized(tmp_path):
+    """Do not leak potentially secret Playwright driver errors to CLI users."""
+    class RejectingBackend:
+        async def start(self, _config): pass
+        async def stop(self): pass
+        def is_connected(self): return True
+        async def add_cookies(self, cookies):
+            raise RuntimeError('driver failure with secret cookie content')
+
+    manager = BrowserManager(BrowserConfig(profile_dir=tmp_path / 'managed'),
+                             backend=RejectingBackend())
+    await manager.start()
+    with pytest.raises(BrowserSessionError, match='browser rejected site-cookie import') as captured:
+        await manager.install_site_cookies('chatgpt.com', [{
+            'domain': '.chatgpt.com', 'name': 'session', 'value': 'secret'
+        }])
+    assert 'secret' not in str(captured.value)
+    await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_cli_rejects_backend_cookie_error_without_traceback(monkeypatch, tmp_path, capsys):
+    ff = make_firefox_profile(tmp_path)
+    make_cookie_db(ff)
+    import openagent.browser as browser
+    monkeypatch.setattr(browser, 'discover_profiles', lambda **kw: [
+        BrowserProfile('firefox', 'default-release', str(ff), 'system', 'site-cookie-import')
+    ])
+    class BadManager:
+        def __init__(self, config): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *_): return None
+        async def install_site_cookies(self, site, cookies):
+            raise BrowserSessionError('browser rejected site-cookie import')
+    monkeypatch.setattr(browser, 'BrowserManager', BadManager)
+    monkeypatch.setattr(cli, '_browser_settings', lambda args: BrowserConfig(profile_dir=tmp_path / 'managed'))
+    assert await cli._import_firefox(Namespace(yes=True, profile=ff, site='chatgpt.com')) == 1
+    output = capsys.readouterr().out
+    assert 'Cookie import failed (BrowserSessionError)' in output
+    assert 'private-chatgpt-cookie' not in output
+    assert 'Traceback' not in output
 
 
 def test_denies_nonapproved_sites_and_missing_databases(tmp_path):
