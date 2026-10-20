@@ -104,3 +104,13 @@ live automation. Never execute model instructions inside the bridge.
   render a hidden control before its visible equivalent.
 - Logged-out fixture tests are not live authorization or capability verification.
 - Never import/copy personal browser authentication material automatically.
+
+## v0.4.4 profile and session migration
+- `browser profiles`: read-only metadata discovery from bounded standard browser roots.
+- `browser session import-firefox`: opt-in, allowlisted ChatGPT cookies only; source
+  Firefox profile must be discovered and explicitly selected; no password access.
+- Cookie values stay in-memory until installed into an OpenAgent-owned persistent
+  browser context. Do not log them, export them or put them in a patch/archive.
+- Cookie import is not proof of login and never overrides a provider security
+  challenge. Browser-specific account restrictions and terms still apply.
+- Directly launching an ordinary Firefox profile via Playwright remains unsupported.

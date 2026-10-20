@@ -61,3 +61,10 @@ Desktop.ini
 openagent-page.png
 *.trace.zip
 playwright-report/
+
+# Browser authentication databases and exported session state
+cookies.sqlite*
+logins.json
+key4.db
+storage-state*.json
+*auth-state*.json

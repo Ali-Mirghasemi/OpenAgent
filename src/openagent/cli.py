@@ -136,10 +136,71 @@ def _discovery(args: argparse.Namespace) -> int:
             print(f"  {item.note}")
         print("\nSelect a backend: openagent browser select chrome|msedge|chromium|firefox")
         print('Portable Chromium: openagent browser select chromium --browser-path "F:\\Browsers\\chrome-win64"')
-        print("System Firefox requires a Playwright-compatible Firefox build; its existing login is not imported.")
+        print("Run `openagent browser profiles` to discover saved browser profiles.")
+        print("Firefox site-cookie import is opt-in; login reuse is not guaranteed.")
     if os.environ.get("PLAYWRIGHT_BROWSERS_PATH") and not args.json:
         print("PLAYWRIGHT_BROWSERS_PATH is a cache ROOT containing versioned browser directories, not a chrome-win64 folder.")
     return 0
+
+
+def _profiles(args: argparse.Namespace) -> int:
+    """List profile folder locations without touching cookie or password stores."""
+    from .browser import discover_profiles
+    profiles = discover_profiles()
+    if args.browser:
+        profiles = [p for p in profiles if p.browser == args.browser]
+    if args.json:
+        print(json.dumps([p.as_dict() for p in profiles], indent=2))
+        return 0
+    if not profiles:
+        print('No browser profiles found in standard locations.')
+    for profile in profiles:
+        print(f'{profile.browser}: {profile.name} [{profile.origin}]')
+        print(f'  Path: {profile.path}')
+        print(f'  Reuse: {profile.reuse}')
+    print('Discovery does not access cookies, saved passwords, or browsing history.')
+    return 0
+
+
+async def _import_firefox(args: argparse.Namespace) -> int:
+    """Opt-in one-site cookie transfer. Never outputs or persists raw cookie values."""
+    from .browser import (BrowserManager, BrowserError, discover_profiles,
+                          firefox_site_cookies, SessionImportError, ALLOWED_SITES)
+    if not args.yes:
+        print('No cookies read. Add --yes to explicitly authorize a site-only cookie import.')
+        return 2
+    source = args.profile.expanduser().resolve()
+    # Never import from an arbitrary folder that merely contains a cookies.sqlite.
+    listed = [p for p in discover_profiles(include_openagent=False)
+              if p.browser == 'firefox' and Path(p.path) == source]
+    if not listed:
+        print('Source must be a Firefox profile listed by `openagent browser profiles --browser firefox`.')
+        return 2
+    if args.site not in ALLOWED_SITES:
+        print('Site is not supported for cookie migration.')
+        return 2
+    try:
+        config = _browser_settings(args)
+        if config.mode != 'persistent':
+            print('Cookie migration requires a dedicated OpenAgent persistent profile.')
+            return 2
+        if source == config.profile_dir.expanduser().resolve():
+            print('Source and destination browser profiles must be different.')
+            return 2
+        cookies = firefox_site_cookies(source, args.site)
+        if not cookies:
+            print('No portable, unexpired cookies for that site in the selected Firefox profile.')
+            return 2
+        async with BrowserManager(config) as manager:
+            count = await manager.install_site_cookies(args.site, cookies)
+        print(f'Imported {count} {args.site} cookies into the OpenAgent {config.browser} profile.')
+        print('Session authentication is NOT confirmed. Run `browser chatgpt-status --headful --details`.')
+        print('Google sign-in restrictions and provider permissions are unaffected by this import.')
+        return 0
+    except (BrowserError, SessionImportError, ValueError, OSError) as exc:
+        # Never include driver/database details, which could expose secret data.
+        print(f'Cookie import failed ({type(exc).__name__}).')
+        return 1
 
 
 def _select_browser(args: argparse.Namespace) -> int:
@@ -333,6 +394,21 @@ def main() -> None:
     discover.add_argument("--search-dir", action="append", default=[], type=Path, metavar="PATH", help="also inspect a portable browser folder (may repeat)")
     discover.add_argument("--json", action="store_true", help="machine-readable candidate list")
 
+    profiles = browser_sub.add_parser('profiles', help='discover saved browser profile locations; no cookie or password access')
+    profiles.add_argument('--browser', choices=['firefox', 'chrome', 'msedge', 'chromium'])
+    profiles.add_argument('--json', action='store_true')
+
+    session = browser_sub.add_parser('session', help='explicit migration of a site session into an OpenAgent-managed browser')
+    session_sub = session.add_subparsers(dest='session_command', required=True)
+    transfer = session_sub.add_parser('import-firefox', help='copy only ChatGPT-domain Firefox cookies from one selected profile')
+    transfer.add_argument('--profile', required=True, type=Path, help='Firefox profile PATH from browser profiles')
+    transfer.add_argument('--site', choices=['chatgpt.com'], default='chatgpt.com')
+    transfer.add_argument('--yes', action='store_true', help='required: authorize reading session cookies from the selected profile')
+    transfer.add_argument('--browser', choices=['chromium', 'chrome', 'msedge', 'firefox'], help='destination Playwright engine; default saved selection')
+    transfer.add_argument('--browser-path', type=Path, help='destination browser executable or directory')
+    transfer.add_argument('--profile-dir', type=Path, help='destination OpenAgent persistent profile')
+    transfer.set_defaults(mode='persistent', cdp_url='http://127.0.0.1:9222', headful=False)
+
     select = browser_sub.add_parser("select", help="save a default browser backend for later probes/adapters")
     select.add_argument("browser", choices=["chromium", "chrome", "msedge", "firefox"])
     select.add_argument("--browser-path", type=Path, help="custom executable or extracted browser folder")
@@ -386,6 +462,10 @@ def main() -> None:
     if args.command == "browser":
         if args.browser_command == "discover":
             raise SystemExit(_discovery(args))
+        if args.browser_command == 'profiles':
+            raise SystemExit(_profiles(args))
+        if args.browser_command == 'session':
+            raise SystemExit(asyncio.run(_import_firefox(args)))
         if args.browser_command == "select":
             raise SystemExit(_select_browser(args))
         if args.browser_command == "diagnose":

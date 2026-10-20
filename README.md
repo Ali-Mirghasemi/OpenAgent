@@ -1,4 +1,4 @@
-# OpenAgent Bridge — v0.4.3
+# OpenAgent Bridge — v0.4.4
 
 **Early Python foundation for a provider-independent AI bridge.** The v0.4.x
 release includes an opt-in, experimental ChatGPT public-UI adapter, verified
@@ -6,6 +6,58 @@ with local fixtures but **not with a live ChatGPT account**. The API serves
 `mock/echo` by default; `chatgpt-web/default` appears only if explicitly
 enabled with `--enable-chatgpt-web` and a bearer token. No automated login,
 model control, native tools, or coding-agent command execution.
+
+## New in v0.4.4 — Discover existing profiles and optional Firefox session reuse
+
+The browser discovery command lists *executables*, while the new profile command
+lists the saved **profile locations** used by Firefox, Chrome, and Edge:
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser profiles
+.\.venv\Scripts\python.exe -m openagent.cli browser profiles --browser firefox
+```
+
+Profile discovery is read-only: it does not inspect stored cookies, history or
+saved passwords. Chrome/Edge system profile folders are **discovery-only**:
+Playwright does not reliably control an existing everyday browser profile, and
+these browsers may protect cookies with OS/application-bound encryption.
+
+**Opt-in Firefox site-cookie import** (requires Firefox already signed into
+ChatGPT, which is different from merely being signed into Google in Firefox):
+
+```powershell
+# 1. First choose the OpenAgent browser where the copied site cookies go:
+.\.venv\Scripts\python.exe -m openagent.cli browser select chromium --browser-path "F:\Browsers\chrome-win64"
+
+# 2. List Firefox profiles (copy one actual Path value from the result):
+.\.venv\Scripts\python.exe -m openagent.cli browser profiles --browser firefox
+
+# 3. Explicitly approve local transfer of ChatGPT-domain cookies only:
+.\.venv\Scripts\python.exe -m openagent.cli browser session import-firefox `
+    --profile "C:\Users\YOU\AppData\Roaming\Mozilla\Firefox\Profiles\YOUR.default-release" `
+    --site chatgpt.com --yes
+
+# 4. Check whether the resulting browser is ACTUALLY logged in:
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful --details
+```
+
+The command reads only the selected Firefox profile's `cookies.sqlite` and
+passes the applicable unexpired, unpartitioned `chatgpt.com` cookies to the
+**separate** OpenAgent persistent browser profile. It does not read Firefox
+passwords, copy Google cookies, print cookie values, export cookies, modify the
+source profile, or make requests to ChatGPT during import. The destination
+browser profile itself contains sensitive session information and must be
+protected and excluded from Git.
+
+**Limitations:** Importing cookies is not proof of authentication. Login might
+still require other browser storage, security binding, fresh credentials, or
+provider permission. The import does not work around Google OAuth browser
+restrictions. If an import fails, sign in through a supported normal browser
+flow or use an authorized ChatGPT OAuth/Codex integration.
+
+With Python 3.10 on Windows, Playwright shutdown after Ctrl+C can emit late
+subprocess transport warnings. This release allows a short drain period after
+Playwright stops; Windows runtime verification is still required.
 
 ## New in v0.4.3 — Recognize a logged-out ChatGPT homepage
 

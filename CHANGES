@@ -1,5 +1,17 @@
 # OpenAgent — Change Log
 
+## 0.4.4 — 2026-10-20
+- Added read-only browser-profile discovery for Firefox (profiles.ini), Chrome,
+  Edge, and existing OpenAgent-managed persistent profiles.
+- Added explicit `browser session import-firefox --profile ... --site chatgpt.com --yes`
+  to import only nonexpired, nonpartitioned ChatGPT site cookies from an enumerated
+  Firefox profile to the selected OpenAgent persistent browser backend.
+- No saved passwords, Google-domain cookies, session JSON export, or automatic login;
+  successful cookie import is not proof of an authenticated ChatGPT session.
+- Added backend-scoped cookie injection guards and offline SQLite tests.
+- Added a short Windows Playwright subprocess-shutdown drain (best-effort);
+  Windows Ctrl+C behavior still needs a real-machine check.
+
 ## 0.4.3 — 2026-10-20
 - Identified the Windows `ui_changed` root cause from a user-provided screenshot:
   the ChatGPT homepage rendered normally but was logged out, showing visible

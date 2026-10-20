@@ -58,6 +58,11 @@ class PlaywrightBackend:
             raise BrowserStartupError("browser disconnected")
         return await self._context.new_page()
 
+    async def add_cookies(self, cookies: list[dict]) -> None:
+        if not self._owned_context or self._context is None or not self.is_connected():
+            raise BrowserStartupError('cookie import requires an owned persistent browser')
+        await self._context.add_cookies(cookies)
+
     async def stop(self) -> None:
         try:
             if self._owned_context and self._context is not None:
@@ -71,3 +76,7 @@ class PlaywrightBackend:
             if self._playwright is not None:
                 await self._playwright.stop()  # Disposes of our CDP connection.
                 self._playwright = None
+                # Windows Proactor subprocess pipe finalizers can otherwise run
+                # after asyncio.run() closes its loop (Python 3.10).
+                import asyncio
+                await asyncio.sleep(0.15)

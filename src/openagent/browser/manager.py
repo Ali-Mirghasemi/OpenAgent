@@ -111,6 +111,7 @@ class BrowserBackend(Protocol):
     async def start(self, config: BrowserConfig) -> None: ...
     async def new_page(self) -> BrowserPage: ...
     async def stop(self) -> None: ...
+    async def add_cookies(self, cookies: list[dict]) -> None: ...
     def is_connected(self) -> bool: ...
 
 
@@ -208,6 +209,24 @@ class BrowserManager:
                 raise BrowserNavigationError("browser navigation failed") from exc
             self._tabs[tab_id] = page
             return page
+
+    async def install_site_cookies(self, site: str, cookies: list[dict]) -> int:
+        """Write explicit site-scoped cookies only to our OWN persistent context.
+
+        Caller must obtain user confirmation before invoking. Does not inspect
+        existing browser cookies or report any secret values.
+        """
+        if self.config.mode != 'persistent':
+            raise BrowserSessionError('cookie import requires an owned persistent profile')
+        if self.status().state != 'running':
+            raise BrowserDisconnected('browser not connected')
+        if not cookies:
+            return 0
+        for cookie in cookies:
+            if cookie.get('domain') not in (site, '.' + site):
+                raise BrowserSessionError('cookie outside approved site scope')
+        await self._backend.add_cookies(cookies)
+        return len(cookies)
 
     def tab(self, tab_id: str) -> BrowserPage:
         if self.status().state != "running":
