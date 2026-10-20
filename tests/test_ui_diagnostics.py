@@ -62,3 +62,28 @@ async def test_closed_page_and_selector_errors():
 def test_required_selectors():
     with pytest.raises(ValueError, match="composer"):
         UISelectors("", "#send", ".assistant")
+
+@pytest.mark.asyncio
+async def test_safe_control_visibility_snapshot():
+    from openagent.browser.diagnostics import inspect_ui_controls
+    result = await inspect_ui_controls(Page("#composer", "#send", "#login"), SELECTORS)
+    assert result["composer"] == "visible"
+    assert result["send_button"] == "visible"
+    assert result["login_required"] == "visible"
+    assert result["security_challenge"] == "not_visible"
+    assert result["response_complete"] == "not_configured"
+    assert all("#" not in value for value in result.values())
+    assert set(result) == {
+        "composer", "send_button", "assistant_message", "login_required",
+        "security_challenge", "rate_limited", "generation_in_progress",
+        "response_complete",
+    }
+
+
+@pytest.mark.asyncio
+async def test_safe_control_snapshot_when_browser_unavailable():
+    from openagent.browser.diagnostics import inspect_ui_controls
+    result = await inspect_ui_controls(Page(closed=True), SELECTORS)
+    assert result["composer"] == "unavailable"
+    result = await inspect_ui_controls(Page(fail=True), SELECTORS)
+    assert result["send_button"] == "unavailable"

@@ -224,23 +224,87 @@ async def _fixture_chat(args: argparse.Namespace) -> int:
 
 async def _chatgpt_status(args: argparse.Namespace) -> int:
     """Read-only public UI inspection; no login or prompt submission."""
+    from urllib.parse import urlsplit
     from .browser import BrowserManager, BrowserError
-    from .providers.chatgpt_web import ChatGPTWebProvider
+    from .browser.diagnostics import inspect_ui, inspect_ui_controls
+    from .providers.chatgpt_web import ChatGPTWebProvider, CHATGPT_SELECTORS, CHATGPT_URL
     try:
         config = _browser_settings(args)
         config = replace(config, allowed_origins=("https://chatgpt.com",))
         async with BrowserManager(config) as manager:
-            observation = await ChatGPTWebProvider(manager).inspect()
-            print(json.dumps(observation.as_dict(), indent=2))
+            if args.details:
+                page = await manager.open_tab("chatgpt-ui-diagnostics", CHATGPT_URL)
+                try:
+                    observation = await inspect_ui(page, CHATGPT_SELECTORS)
+                    controls = await inspect_ui_controls(page, CHATGPT_SELECTORS)
+                    # Report only whether navigation stayed on ChatGPT, not
+                    # paths, query parameters, page text or account details.
+                    on_chatgpt = urlsplit(page.url).hostname == "chatgpt.com"
+                finally:
+                    await manager.close_tab("chatgpt-ui-diagnostics")
+                result = {**observation.as_dict(), "on_chatgpt_domain": on_chatgpt,
+                          "controls": controls}
+            else:
+                observation = await ChatGPTWebProvider(manager).inspect()
+                result = observation.as_dict()
+            print(json.dumps(result, indent=2))
         return 0 if observation.state == "ready" else 2
     except (BrowserError, ValueError) as exc:
         print(f"ChatGPT UI diagnostics failed: {exc}")
         return 1
 
 
+def _api_check(args: argparse.Namespace) -> int:
+    """Check a loopback OpenAgent server without displaying or storing secrets."""
+    from urllib.parse import urlsplit
+    import httpx
+
+    target = urlsplit(args.url)
+    if target.scheme not in ("http", "https") or target.hostname not in (
+        "localhost", "127.0.0.1", "::1"
+    ) or target.username or target.password or target.query or target.fragment:
+        print("api-check accepts only a loopback HTTP(S) OpenAgent server URL")
+        return 1
+    base = args.url.rstrip("/")
+    try:
+        health = httpx.get(f"{base}/health", timeout=5.0)
+        health.raise_for_status()
+        health_data = health.json()
+        if health_data.get("service") != "openagent-bridge":
+            print("Server responded, but it is not identified as OpenAgent Bridge")
+            return 1
+        print(f"OpenAgent Bridge reachable (version {health_data.get('version', 'unknown')})")
+
+        token = os.environ.get("OPENAGENT_API_TOKEN", "")
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        models = httpx.get(f"{base}/v1/models", headers=headers, timeout=5.0)
+        if models.status_code == 401:
+            print("API authentication failed (401). Set OPENAGENT_API_TOKEN in THIS "
+                  "PowerShell terminal to match the token used when the server started.")
+            print("If using Invoke-RestMethod, rebuild $headers after setting the token.")
+            return 2
+        models.raise_for_status()
+        payload = models.json()
+        model_ids = [row.get("id") for row in payload.get("data", [])
+                     if isinstance(row, dict)]
+        print(f"API authentication successful; models: {', '.join(str(x) for x in model_ids)}")
+        return 0
+    except (httpx.HTTPError, ValueError) as exc:
+        # No secret or untrusted HTTP body is printed here.
+        if isinstance(exc, httpx.ConnectError):
+            print("Cannot connect to OpenAgent. Start 'serve' in another terminal "
+                  "and use the port printed by Uvicorn.")
+        else:
+            print(f"OpenAgent API check failed ({type(exc).__name__})")
+        return 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="openagent")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    check = sub.add_parser("api-check", help="test loopback server reachability and bearer authentication")
+    check.add_argument("--url", default="http://127.0.0.1:12321", help="local OpenAgent HTTP server URL")
 
     serve = sub.add_parser("serve", help="serve the local HTTP bridge")
     serve.add_argument("--host", default="127.0.0.1")
@@ -292,6 +356,7 @@ def main() -> None:
     diagnose.add_argument("--done-selector")
 
     chatgpt_status = browser_sub.add_parser("chatgpt-status", help="EXPERIMENTAL read-only ChatGPT UI status, not a login proof")
+    chatgpt_status.add_argument("--details", action="store_true", help="show selector visibility without page text or account data")
 
     fixture = browser_sub.add_parser("ui-test", help="submit one turn ONLY to a locally hosted UI fixture")
     fixture.add_argument("--url", default="http://127.0.0.1:8999/chat_fixture.html")
@@ -306,6 +371,8 @@ def main() -> None:
         p.add_argument("--headful", action="store_true")
 
     args = parser.parse_args()
+    if args.command == "api-check":
+        raise SystemExit(_api_check(args))
     if args.command == "browser":
         if args.browser_command == "discover":
             raise SystemExit(_discovery(args))

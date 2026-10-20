@@ -1,5 +1,15 @@
 # OpenAgent — TODO
 
+## v0.4.1 — Windows diagnostics follow-up
+- [x] Add loopback-only API reachability and bearer authentication smoke check.
+- [x] Add read-only per-control selector visibility inspection for `ui_changed`.
+- [x] Add regression tests without reading account information or remote endpoints.
+- [x] Explain process-scoped PowerShell environment variables and stale `$headers`.
+- [ ] Run `api-check` on user's Windows setup in a second terminal.
+- [ ] Run `chatgpt-status --headful --details` and inspect selector evidence.
+- [ ] Do not claim real ChatGPT support until permitted live tests succeed.
+
+
 Check off only work covered by tests or a documented manual verification.
 
 ## v0.2.2 — Windows/browser follow-up

@@ -78,3 +78,33 @@ async def inspect_ui(page: PageLike, selectors: UISelectors) -> UIObservation:
         # A detached/changed DOM is not an excuse to return 'ready'.
         return UIObservation("ui_changed", "selector_unavailable")
     return UIObservation("ui_changed", "expected_controls_missing")
+
+
+async def inspect_ui_controls(page: PageLike, selectors: UISelectors) -> dict[str, str]:
+    """Read-only selector visibility for troubleshooting a changed site UI.
+
+    Returns fixed field names and states only: no DOM text, cookies, browser
+    storage, URL query strings, or raw selector errors are exposed.
+    An invisible control may be absent, hidden, or in a different layout.
+    """
+    result: dict[str, str] = {}
+    for field in (
+        "composer", "send_button", "assistant_message", "login_required",
+        "security_challenge", "rate_limited", "generation_in_progress",
+        "response_complete",
+    ):
+        selector = getattr(selectors, field)
+        if not selector:
+            result[field] = "not_configured"
+            continue
+        if page.is_closed():
+            result[field] = "unavailable"
+            continue
+        try:
+            result[field] = (
+                "visible" if await page.locator(selector).first.is_visible()
+                else "not_visible"
+            )
+        except Exception:
+            result[field] = "unavailable"
+    return result

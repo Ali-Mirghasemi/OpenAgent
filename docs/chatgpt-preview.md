@@ -1,4 +1,4 @@
-# ChatGPT Web UI adapter preview — v0.4.0
+# ChatGPT Web UI adapter preview — v0.4.1
 
 ## Status and scope
 
@@ -77,3 +77,22 @@ No verified model enumeration, effort switching, ChatGPT Projects, attachment
 upload/download, native tool calls, real streaming, upstream conversation resume,
 rate-limit information, or automatic context rollover. Any of these requires a
 separate capability with live tests; do not mark them supported in the manifest.
+
+## Windows authentication troubleshooting (v0.4.1)
+
+If `GET /v1/models` returns 401, verify that both the server and the client
+terminal set the **same** token; PowerShell environment variables are
+process-scoped. Recreate `$headers` **after** setting the client token.
+
+The new read-only command performs both a health check and a token-authenticated
+model-list request from the client terminal, without printing credentials:
+
+```powershell
+$env:OPENAGENT_API_TOKEN = Read-Host "OpenAgent API token"
+.\.venv\Scripts\python.exe -m openagent.cli api-check
+```
+
+If the server is on another local port, pass `--url http://127.0.0.1:PORT`.
+This command rejects non-loopback destinations to avoid forwarding a local
+secret to an arbitrary remote host. Further details in
+[windows-auth-troubleshooting.md](windows-auth-troubleshooting.md).

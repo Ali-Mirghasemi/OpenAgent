@@ -1,5 +1,15 @@
 # OpenAgent — Change Log
 
+## 0.4.1 — 2026-10-20
+- Added local-only `api-check` that distinguishes unreachable server, 401 token mismatch,
+  and successful authorized model discovery without printing secrets.
+- Added `browser chatgpt-status --details` to show read-only selector visibility
+  and whether the browser remained on chatgpt.com (no page text or credentials).
+- Documented two independent PowerShell terminals, environment variable scope,
+  and rebuilding `$headers` after setting the API token.
+- Added targeted regression tests. Live ChatGPT website compatibility is unverified.
+
+
 ## 0.4.0 — 2026-10-20
 - Added opt-in `chatgpt-web/default` public UI preview behind `--enable-chatgpt-web`;
   browser profile selection is inherited from v0.2.1. No automated login.

@@ -1,11 +1,11 @@
-# OpenAgent Bridge — v0.3.0
+# OpenAgent Bridge — v0.4.1
 
-**Early Python foundation for a provider-independent AI bridge.** v0.3
-adds read-only browser UI diagnostics and an experimental, fixture-verified DOM
-chat adapter. There is still **no live ChatGPT, Claude, or DeepSeek adapter**,
-no login automation, and no coding-agent tool execution. Only `mock/echo` is
-registered in the HTTP service. The `fixture/ui` model is usable through the
-local `browser ui-test` command, not as a public AI model.
+**Early Python foundation for a provider-independent AI bridge.** The v0.4.x
+release includes an opt-in, experimental ChatGPT public-UI adapter, verified
+with local fixtures but **not with a live ChatGPT account**. The API serves
+`mock/echo` by default; `chatgpt-web/default` appears only if explicitly
+enabled with `--enable-chatgpt-web` and a bearer token. No automated login,
+model control, native tools, or coding-agent command execution.
 
 ## What is implemented
 
@@ -176,6 +176,17 @@ Read-only UI check (uses the previously selected OpenAgent browser/profile):
 The result reports observable `ready`, `login_required`, `security_challenge`,
 `ui_changed` etc. UI readiness is not account-authentication proof.
 
+For `ui_changed`, use read-only visibility diagnostics:
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful --details
+```
+
+The output identifies which configured composer, send, login, and challenge
+selectors are visible; it does **not** retrieve page text, credentials or
+cookies. `ui_changed` alone cannot distinguish an unsigned-in session from a
+website layout change. See `docs/windows-auth-troubleshooting.md`.
+
 To explicitly enable this experimental backend over loopback HTTP, **set a
 strong local token** in `OPENAGENT_API_TOKEN` and start:
 
@@ -184,6 +195,20 @@ strong local token** in `OPENAGENT_API_TOKEN` and start:
 $env:OPENAGENT_API_TOKEN = Read-Host "Local OpenAgent API token"
 .\.venv\Scripts\python.exe -m openagent.cli serve --enable-chatgpt-web --headful
 ```
+
+**Use two separate PowerShell terminals.** Environment variables and `$headers`
+are not shared between them. Set the same `OPENAGENT_API_TOKEN` in both and
+rebuild `$headers` after assigning the token. With the server still running,
+you can check the connection from Terminal 2 without constructing HTTP headers:
+
+```powershell
+$env:OPENAGENT_API_TOKEN = Read-Host "OpenAgent API token"
+.\.venv\Scripts\python.exe -m openagent.cli api-check
+```
+
+`api-check` first checks unauthenticated `/health`, then authorized `/v1/models`;
+`401` is reported as a token mismatch and a connection refusal as a stopped
+server or wrong port. No token values are printed or stored.
 
 Visit `/v1/models` with `Authorization: Bearer <your token>` to see
 `chatgpt-web/default`; `/openagent/capabilities/chatgpt-web/default` shows

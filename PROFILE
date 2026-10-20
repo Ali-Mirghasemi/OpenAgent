@@ -30,6 +30,13 @@ and 9Router. A separate standalone coding agent is a later product layer.
 - Protect sessions, token material, browser profiles, downloaded artifacts and
   console diagnostics from accidental publication.
 
+## v0.4.1 follow-up
+- `api-check` only permits loopback endpoints and does not disclose bearer credentials.
+- Read-only `chatgpt-status --details` exposes fixed selector visibility labels
+  and an origin boolean; never expose page contents or full redirect URLs.
+- PowerShell environment variables are terminal-local; the API server reads its
+  token at process startup. 401 is different from browser UI `ui_changed`.
+
 ## v0.4.0 implemented (preview)
 - Experimental, explicit opt-in `chatgpt-web/default` adapter for the public
   ChatGPT UI, *not* native API access and not a verified live integration.
