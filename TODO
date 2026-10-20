@@ -1,3 +1,12 @@
+## v0.4.6 — Authenticated idle composer
+- [x] Account for ChatGPT hiding Send before text is entered.
+- [x] Wait for visible/enabled Send after filling, without automatic retry.
+- [x] Preserve login-required priority over composer visibility.
+- [x] Add deterministic browser fixture with a dynamically appearing Send control.
+- [ ] Verify read-only `chatgpt-status --details` on imported session under Windows.
+- [ ] Verify real Send-control selectors only where UI automation is permitted.
+- [ ] Verify Ctrl+C subprocess cleanup in a Windows terminal.
+
 ## v0.4.5 — Firefox cookie expiry interoperability
 - [x] Normalize out-of-range future expiry timestamps for Playwright.
 - [x] Reject invalid and expired timestamps without extending their validity.

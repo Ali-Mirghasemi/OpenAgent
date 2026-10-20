@@ -281,3 +281,25 @@ async def test_app_lifespan_closes_browser_manager(tmp_path, store):
         assert browser.status().state == 'running'
     assert browser.status().state == 'stopped'
     assert backend.connected is False
+
+@pytest.mark.asyncio
+async def test_chatgpt_send_unavailable_does_not_click(tmp_path, monkeypatch):
+    """An idle homepage can be reported ready without a clickable Send button.
+
+    But it must NEVER submit or mark a request ambiguous if the UI never
+    exposes an enabled Send after typing.
+    """
+    provider, browser, backend = setup(tmp_path, behavior='stuck', timeout=1)
+    backend_behavior = backend
+    original = Locator.is_visible
+    async def invisible_send(self):
+        if self.selector == CHATGPT_SELECTORS.send_button:
+            return False
+        return await original(self)
+    monkeypatch.setattr(Locator, "is_visible", invisible_send)
+    with pytest.raises(BrowserUIError) as exc:
+        await provider.complete(CHATGPT_MODEL, [Message(role='user', content='test')])
+    assert exc.value.code == 'submit_unavailable'
+    assert backend_behavior.pages[0].clicks == 0
+    assert backend_behavior.pages[0].closed
+    await browser.stop()

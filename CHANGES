@@ -1,3 +1,15 @@
+## 0.4.6 — 2026-10-20
+- Windows report: 22 ChatGPT-domain Firefox cookies imported; operator confirms
+  login, while status returned ui_changed because Send was hidden on an idle page.
+- Allow explicitly configured providers (ChatGPT preview only) to treat a visible
+  idle composer as UI-ready even if Send is not visible until the user types.
+- Before submitting, require an actually visible, enabled Send button after
+  filling text; fail with submit_unavailable and no submission otherwise.
+- Keep login, security challenge, rate limit and busy markers higher priority;
+  readiness remains visual evidence, NOT an authentication guarantee.
+- Add synthetic idle-homepage DOM fixture and safe regression tests.
+- No real ChatGPT submission or site permission verified by this release.
+
 # OpenAgent — Change Log
 
 ## 0.4.5 — 2026-10-20

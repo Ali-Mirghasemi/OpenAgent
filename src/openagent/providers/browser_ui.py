@@ -128,12 +128,16 @@ class BrowserUIProvider(Provider):
             # whether it was absent *before* this turn was submitted.
             done_was_absent = bool(s.response_complete and not await page.locator(s.response_complete).first.is_visible())
             await page.locator(s.composer).fill(serialize_messages(messages))
+            # The homepage may render an inactive/hidden Send button until
+            # typing. Wait for a *visible and enabled* control before any
+            # submission. Failure here is safe to retry (nothing was sent).
+            send_control = await self._wait_for_send_ready(page)
             # Only submit once. An error after clicking leaves the outcome
             # ambiguous; never retry automatically.
             # Mark outcome ambiguous before clicking: click may submit remotely
             # and then raise while awaiting browser acknowledgement.
             submitted = True
-            await page.locator(s.send_button).click()
+            await send_control.click()
             return ProviderOutput(content=await self._wait_for_answer(page, baseline, done_was_absent))
         except BrowserUIError:
             raise
@@ -147,6 +151,37 @@ class BrowserUIProvider(Provider):
         finally:
             if page is not None:
                 await self.browser.close_tab(tab_id)
+
+    async def _wait_for_send_ready(self, page: Any) -> Any:
+        """Wait briefly for a clickable send control, but NEVER submit here.
+
+        No text, cookies or browser page content is logged. We inspect at most
+        32 matches because responsive pages may have hidden duplicate buttons.
+        """
+        deadline = time.monotonic() + min(5.0, self.site.timeout_s)
+        while True:
+            state = await inspect_ui(page, self.site.selectors)
+            if state.state in (
+                "login_required", "security_challenge", "rate_limited",
+                "generation_in_progress", "browser_disconnected",
+            ):
+                raise BrowserUIError(state.state, "browser UI is not available before submission: " + state.state)
+            locator = page.locator(self.site.selectors.send_button)
+            candidates = []
+            if callable(getattr(locator, "count", None)) and callable(getattr(locator, "nth", None)):
+                candidates = [locator.nth(i) for i in range(min(32, await locator.count()))]
+            else:
+                candidates = [locator.first]
+            for candidate in candidates:
+                if await candidate.is_visible():
+                    enabled = getattr(candidate, "is_enabled", None)
+                    if not callable(enabled) or await enabled():
+                        return candidate
+            if time.monotonic() >= deadline:
+                raise BrowserUIError(
+                    "submit_unavailable", "no visible, enabled Send control after typing; nothing submitted",
+                )
+            await asyncio.sleep(min(self.site.poll_s, 0.2))
 
     async def _wait_for_answer(self, page: Any, baseline: int, done_was_absent: bool) -> str:
         s = self.site.selectors

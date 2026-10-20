@@ -441,3 +441,16 @@ This is local OpenAgent session history, not a ChatGPT-native Project or chat.
 
 See [docs/architecture.md](docs/architecture.md) for boundaries and
 [docs/browser-manager.md](docs/browser-manager.md) for transport semantics.
+
+
+### Authenticated idle composer (v0.4.6)
+After the Firefox ChatGPT-site cookie import, a browser page may be signed in
+while its Send button is disabled or hidden until the message field has text.
+`browser chatgpt-status --headful --details` may now return
+`ready` / `composer_visible_send_inactive`. This is **UI readiness only**, not
+proof of authentication or authorization to automate the website.
+
+The bridge's experimental ChatGPT provider will refuse to click Send unless an
+enabled and visible Send control appears *after* text entry. No message is
+submitted by `chatgpt-status`, and `submit_unavailable` means nothing was sent.
+The provider's live UI compatibility and service permissions remain unverified.

@@ -55,6 +55,7 @@ CHATGPT_SELECTORS = UISelectors(
     rate_limited='[data-testid="rate-limit-error"]',
     generation_in_progress='button[data-testid="stop-button"]',
     response_complete='button[data-testid="copy-turn-action-button"]',
+    send_button_may_appear_after_input=True,
 )
 
 # Only the *new* assistant turn's own enclosing article is considered complete.

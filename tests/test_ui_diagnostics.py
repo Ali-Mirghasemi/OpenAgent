@@ -118,3 +118,17 @@ async def test_second_visible_login_marker_takes_priority_over_composer():
     assert state.state == 'login_required'
     controls = await inspect_ui_controls(ManyPage(), SELECTORS)
     assert controls['login_required'] == 'visible'
+
+@pytest.mark.asyncio
+async def test_explicit_idle_composer_ready_without_send():
+    selectors = UISelectors(
+        '#composer', '#send', '.assistant',
+        login_required='#login',
+        send_button_may_appear_after_input=True,
+    )
+    idle = await inspect_ui(Page('#composer'), selectors)
+    assert idle.state == 'ready'
+    assert idle.evidence == 'composer_visible_send_inactive'
+    assert (await inspect_ui(Page('#composer', '#login'), selectors)).state == 'login_required'
+    assert (await inspect_ui(Page(), selectors)).state == 'ui_changed'
+    assert (await inspect_ui(Page('#composer', '#send'), selectors)).evidence == 'composer_and_send_button'

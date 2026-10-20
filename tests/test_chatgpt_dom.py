@@ -66,3 +66,35 @@ async def test_anonymous_chatgpt_layout_real_chromium(tmp_path):
         with pytest.raises(BrowserUIError) as error:
             await provider.complete(CHATGPT_MODEL, [Message(role='user', content='should not submit')])
         assert error.value.code == 'login_required'
+
+
+@pytest.mark.asyncio
+async def test_logged_in_idle_page_send_appears_only_after_typing_real_chromium(tmp_path):
+    """Local HTML fixture. Readiness must not click or send any message."""
+    executable = find_chromium_executable()
+    if not executable:
+        pytest.skip('No installed Chromium for optional real DOM test')
+    try:
+        import playwright  # noqa: F401
+    except ImportError:
+        pytest.skip('Playwright not installed')
+
+    from openagent.browser.diagnostics import inspect_ui_controls
+    html = (Path(__file__).parents[1] / 'examples' / 'chatgpt_idle_fixture.html').read_text(encoding='utf-8')
+    backend = LocalContentBackend(executable, html)
+    browser = BrowserManager(BrowserConfig(profile_dir=tmp_path / 'idle-profile'), backend=backend)
+    provider = ChatGPTWebProvider(browser, timeout_s=3, poll_s=.04, stable_observations=3,
+                                  url='http://127.0.0.1:8999/idle.html')
+    async with browser:
+        observed = await provider.inspect()
+        assert observed.state == 'ready'
+        assert observed.evidence == 'composer_visible_send_inactive'
+        page = await browser.open_tab('idle', provider.site.url)
+        controls = await inspect_ui_controls(page, provider.site.selectors)
+        assert controls['composer'] == 'visible'
+        assert controls['send_button'] == 'not_visible'
+        assert controls['login_required'] == 'not_visible'
+        assert await page.locator(provider.site.selectors.assistant_message).count() == 0
+        await browser.close_tab('idle')
+        output = await provider.complete(CHATGPT_MODEL, [Message(role='user', content='hello')])
+        assert output.content == 'Response from idle composer fixture'

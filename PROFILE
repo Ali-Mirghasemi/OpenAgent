@@ -120,3 +120,10 @@ live automation. Never execute model instructions inside the bridge.
   Playwright/Chromium year-9999 limit, and skips invalid or expired values.
 - Errors from Playwright cookie insertion must not expose raw cookie data.
 - Regression tests must not read real browser profiles or sessions.
+
+## v0.4.6 homepage readiness
+- Some provider UIs render Send only after the composer has content. A provider
+  must explicitly opt into composer-only visual readiness. Anonymous login UI
+  markers take priority; this is never proof of authentication.
+- Submission requires a separate post-fill check for visible/enabled Send;
+  no remote request is submitted if that check fails.

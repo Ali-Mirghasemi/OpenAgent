@@ -26,6 +26,9 @@ class UISelectors:
     rate_limited: str | None = None
     generation_in_progress: str | None = None
     response_complete: str | None = None
+    # Some UIs hide/disable Send until the composer has input. Explicit opt-in
+    # avoids relaxing readiness rules for ordinary browser providers.
+    send_button_may_appear_after_input: bool = False
 
     def __post_init__(self) -> None:
         for field in ("composer", "send_button", "assistant_message"):
@@ -90,8 +93,13 @@ async def inspect_ui(page: PageLike, selectors: UISelectors) -> UIObservation:
         ):
             if await visible(getattr(selectors, field)):
                 return UIObservation(state, field)
-        if await visible(selectors.composer) and await visible(selectors.send_button):
-            return UIObservation("ready", "composer_and_send_button")
+        if await visible(selectors.composer):
+            if await visible(selectors.send_button):
+                return UIObservation("ready", "composer_and_send_button")
+            if selectors.send_button_may_appear_after_input:
+                # UI readiness only, not authentication proof. Login markers
+                # were checked first, but may be localized or unavailable.
+                return UIObservation("ready", "composer_visible_send_inactive")
     except Exception:
         # A detached/changed DOM is not an excuse to return 'ready'.
         return UIObservation("ui_changed", "selector_unavailable")

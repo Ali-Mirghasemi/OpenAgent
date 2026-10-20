@@ -106,3 +106,15 @@ semantic login buttons/links and returns `login_required`. Do not infer that a
 visible anonymous message editor means the account is authenticated. Detection
 remains read-only, and login behavior is not automated. Google and other identity
 providers may refuse sign-in in software-controlled browser sessions.
+
+
+## Logged-in idle homepage (v0.4.6)
+The observed Windows session reused 22 explicitly imported site cookies and
+rendered the message editor with login controls absent. ChatGPT may not show
+an enabled Send button until there is text. An adapter may opt into treating
+composer visibility as `ready` with evidence `composer_visible_send_inactive`.
+
+This does not verify account authentication: anonymous/localized UIs may show
+editors too. Login/challenge/rate-limit markers retain priority. The read-only
+status check never sends text. Actual submission requires an enabled and visible
+Send button after composing; it fails safely without clicking otherwise.

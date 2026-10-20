@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Logged-in idle UI fixture</title></head>
+<body>
+<main id="history"></main>
+<div role="textbox" contenteditable="true" aria-label="Ask ChatGPT"></div>
+<button data-testid="send-button" hidden disabled>Send</button>
+<button data-testid="stop-button" hidden>Stop</button>
+<script>
+  const editor = document.querySelector('[role="textbox"]');
+  const send = document.querySelector('[data-testid="send-button"]');
+  editor.addEventListener('input', () => {
+    send.hidden = !editor.textContent.trim();
+    send.disabled = !editor.textContent.trim();
+  });
+  send.addEventListener('click', () => {
+    const article = document.createElement('article');
+    const answer = document.createElement('div');
+    answer.setAttribute('data-message-author-role', 'assistant');
+    const text = document.createElement('div');
+    text.className = 'markdown';
+    const pending = document.createElement('span');
+    pending.setAttribute('aria-busy', 'true');
+    answer.append(text, pending);
+    const copy = document.createElement('button');
+    copy.dataset.testid = 'copy-turn-action-button';
+    copy.textContent = 'Copy';
+    article.append(answer, copy);
+    document.querySelector('#history').append(article);
+    const stop = document.querySelector('[data-testid="stop-button"]');
+    stop.hidden = false;
+    text.textContent = 'Partial';
+    setTimeout(() => {
+      text.textContent = 'Response from idle composer fixture';
+      stop.hidden = true;
+      pending.remove();
+    }, 120);
+  }, {once: true});
+</script>
+</body></html>
