@@ -86,3 +86,13 @@ or independent coding agent.
 Do not use a real everyday Chrome profile as the Playwright persistent user
 profile. CDP must stay loopback. Verify provider permissions and terms before
 live automation. Never execute model instructions inside the bridge.
+
+## Browser diagnostics policy (v0.4.2)
+- A browser URL host matching chatgpt.com is not proof of a usable chat session.
+- Probe UI state after bounded SPA hydration; do not mistake missing controls
+  for a confirmed selector regression or completed login.
+- Show only non-content DOM shape; never log page HTML, user messages,
+  full URLs, cookies, local storage or account details.
+- Screenshots must be explicit opt-in, local only, not overwritten, and
+  reviewed by the operator before any sharing.
+- No evasion of provider authentication challenges or service limits.

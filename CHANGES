@@ -1,5 +1,20 @@
 # OpenAgent — Change Log
 
+## 0.4.2 — 2026-10-20
+- Confirmed from Windows logs: authenticated /v1/models returns HTTP 200; 78 tests
+  passed, but ChatGPT UI diagnostics found no visible controls.
+- Added `browser chatgpt-status --wait-seconds N` (default 8, max 30) to wait
+  for SPA hydration before classifying a missing composer as `ui_changed`.
+- Extended `--details` with a safe DOM-shape summary (load state, main/body
+  presence and control counts). No page text, URL path, cookies, tokens or
+  account information is captured or printed.
+- Added explicit opt-in `--screenshot PATH.png`, locally saved with no
+  overwrite. The screenshot can contain private account/chat information;
+  review locally before sharing.
+- Added offline regression tests for hydration delay, missing UI, error
+  sanitization, explicit screenshot saving and no-overwrite behavior.
+- No live ChatGPT adapter verification or authentication workaround.
+
 ## 0.4.1 — 2026-10-20
 - Added local-only `api-check` that distinguishes unreachable server, 401 token mismatch,
   and successful authorized model discovery without printing secrets.

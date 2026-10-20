@@ -1,12 +1,23 @@
 # OpenAgent — TODO
 
+## v0.4.2 — Page detection follow-up
+- [x] Add bounded render wait to read-only `chatgpt-status` diagnostics.
+- [x] Inspect safe DOM shape without exporting messages, page text or credentials.
+- [x] Support explicit private, local-only screenshot when needed.
+- [x] Add tests for hydration, empty/changed page and screenshot no-overwrite.
+- [x] Verify authenticated API requests and 78 v0.4.1 tests on Windows (user logs).
+- [ ] Validate actual ChatGPT DOM shape in the selected browser profile on Windows.
+- [ ] Review local screenshot before sharing; never upload credentials or cookies.
+- [ ] Update selectors only once the actual page state is identified.
+- [ ] Check permitted authentication options if site disallows browser automation.
+
 ## v0.4.1 — Windows diagnostics follow-up
 - [x] Add loopback-only API reachability and bearer authentication smoke check.
 - [x] Add read-only per-control selector visibility inspection for `ui_changed`.
 - [x] Add regression tests without reading account information or remote endpoints.
 - [x] Explain process-scoped PowerShell environment variables and stale `$headers`.
-- [ ] Run `api-check` on user's Windows setup in a second terminal.
-- [ ] Run `chatgpt-status --headful --details` and inspect selector evidence.
+- [x] Run `api-check` on user's Windows setup in a second terminal.
+- [x] Run `chatgpt-status --headful --details`; all controls were not visible, requiring deeper read-only diagnostics.
 - [ ] Do not claim real ChatGPT support until permitted live tests succeed.
 
 

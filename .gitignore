@@ -56,3 +56,8 @@ artifacts/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Locally saved diagnostic screenshots and traces
+openagent-page.png
+*.trace.zip
+playwright-report/

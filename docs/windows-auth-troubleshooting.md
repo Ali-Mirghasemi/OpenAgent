@@ -54,3 +54,28 @@ a security challenge.
 
 The 404 favicon response and third-party `starlette.testclient` deprecation
 warning are unrelated to either issue.
+
+## Windows v0.4.1 verified / next read-only diagnosis (v0.4.2)
+
+Windows logs confirm that `api-check` succeeded and `/v1/models` returned
+`mock/echo` and `chatgpt-web/default` with HTTP 200. Therefore the HTTP
+bearer token issue is resolved. The ChatGPT UI report had
+`on_chatgpt_domain: true` but **no detected controls**. This alone cannot
+distinguish delayed JavaScript rendering from login/alternate layouts.
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful --details --wait-seconds 12
+```
+
+Look at `surface` and `controls`: if `ready_state` is complete and visible
+editables/buttons are still zero, inspect the visible browser page manually
+for a login, challenge, blank screen or unsupported interface. Do not
+automatically retry login or bypass a security check.
+
+If non-content metadata is insufficient, capture a **local** screenshot
+explicitly using `--screenshot "$env:USERPROFILE\openagent-page.png"`.
+Review it and redact personal information before sharing. This file may contain
+account and conversation data; never commit it to the repository.
+
+`browser chatgpt-status` automatically closes its diagnostic tab. Do not run
+it simultaneously with `browser open` using the same persistent profile.

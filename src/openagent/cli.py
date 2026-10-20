@@ -226,31 +226,39 @@ async def _chatgpt_status(args: argparse.Namespace) -> int:
     """Read-only public UI inspection; no login or prompt submission."""
     from urllib.parse import urlsplit
     from .browser import BrowserManager, BrowserError
-    from .browser.diagnostics import inspect_ui, inspect_ui_controls
-    from .providers.chatgpt_web import ChatGPTWebProvider, CHATGPT_SELECTORS, CHATGPT_URL
+    from .browser.surface import observe_status, inspect_surface, save_private_screenshot
+    from .providers.chatgpt_web import CHATGPT_SELECTORS, CHATGPT_URL
     try:
-        config = _browser_settings(args)
-        config = replace(config, allowed_origins=("https://chatgpt.com",))
+        config = replace(_browser_settings(args), allowed_origins=("https://chatgpt.com",))
         async with BrowserManager(config) as manager:
-            if args.details:
-                page = await manager.open_tab("chatgpt-ui-diagnostics", CHATGPT_URL)
-                try:
-                    observation = await inspect_ui(page, CHATGPT_SELECTORS)
-                    controls = await inspect_ui_controls(page, CHATGPT_SELECTORS)
-                    # Report only whether navigation stayed on ChatGPT, not
-                    # paths, query parameters, page text or account details.
-                    on_chatgpt = urlsplit(page.url).hostname == "chatgpt.com"
-                finally:
-                    await manager.close_tab("chatgpt-ui-diagnostics")
-                result = {**observation.as_dict(), "on_chatgpt_domain": on_chatgpt,
-                          "controls": controls}
-            else:
-                observation = await ChatGPTWebProvider(manager).inspect()
+            page = await manager.open_tab("chatgpt-ui-diagnostics", CHATGPT_URL)
+            try:
+                observation, controls, elapsed = await observe_status(
+                    page, CHATGPT_SELECTORS, wait_seconds=args.wait_seconds,
+                )
+                # Report only whether navigation stayed on ChatGPT, not paths,
+                # query parameters, page text or account details.
+                on_chatgpt = urlsplit(page.url).hostname == "chatgpt.com"
                 result = observation.as_dict()
+                if args.details:
+                    result.update({
+                        "on_chatgpt_domain": on_chatgpt,
+                        "waited_seconds": elapsed,
+                        "controls": controls,
+                        "surface": await inspect_surface(page),
+                    })
+                if args.screenshot is not None:
+                    print("CAUTION: screenshot may contain private account/chat content. Review before sharing.",
+                          file=sys.stderr)
+                    await save_private_screenshot(page, args.screenshot)
+                    result["screenshot_saved_locally"] = True
+            finally:
+                await manager.close_tab("chatgpt-ui-diagnostics")
             print(json.dumps(result, indent=2))
         return 0 if observation.state == "ready" else 2
-    except (BrowserError, ValueError) as exc:
-        print(f"ChatGPT UI diagnostics failed: {exc}")
+    except (BrowserError, ValueError, OSError) as exc:
+        # Avoid showing a browser exception that may contain private URL data.
+        print(f"ChatGPT UI diagnostics failed ({type(exc).__name__}).")
         return 1
 
 
@@ -356,7 +364,9 @@ def main() -> None:
     diagnose.add_argument("--done-selector")
 
     chatgpt_status = browser_sub.add_parser("chatgpt-status", help="EXPERIMENTAL read-only ChatGPT UI status, not a login proof")
-    chatgpt_status.add_argument("--details", action="store_true", help="show selector visibility without page text or account data")
+    chatgpt_status.add_argument("--details", action="store_true", help="show safe selector and DOM-shape metadata (no page text or account data)")
+    chatgpt_status.add_argument("--wait-seconds", type=float, default=8.0, help="wait up to 0-30 seconds for the app UI to render (default 8)")
+    chatgpt_status.add_argument("--screenshot", type=Path, help="OPTIONAL local PNG: may contain private chat/account details; never shared automatically")
 
     fixture = browser_sub.add_parser("ui-test", help="submit one turn ONLY to a locally hosted UI fixture")
     fixture.add_argument("--url", default="http://127.0.0.1:8999/chat_fixture.html")

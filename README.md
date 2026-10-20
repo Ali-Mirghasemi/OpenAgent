@@ -1,4 +1,4 @@
-# OpenAgent Bridge — v0.4.1
+# OpenAgent Bridge — v0.4.2
 
 **Early Python foundation for a provider-independent AI bridge.** The v0.4.x
 release includes an opt-in, experimental ChatGPT public-UI adapter, verified
@@ -6,6 +6,31 @@ with local fixtures but **not with a live ChatGPT account**. The API serves
 `mock/echo` by default; `chatgpt-web/default` appears only if explicitly
 enabled with `--enable-chatgpt-web` and a bearer token. No automated login,
 model control, native tools, or coding-agent command execution.
+
+## New in v0.4.2 — diagnosing an empty ChatGPT UI
+
+Your v0.4.1 Windows tests and API authorization succeeded; the remaining
+`ui_changed` result means OpenAgent did not see its expected controls.
+This does **not** prove the account is logged in or that selectors changed.
+
+```powershell
+# Browser must not already be open with the same OpenAgent profile.
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful --details --wait-seconds 12
+```
+
+`--details` shows only safe counts/presence: document readiness, whether
+`main` and `body` exist, visible editor/button counts and iframe count, plus
+configured control visibility. It doesn't read or print page text, DOM HTML,
+full URLs, tokens, browser storage or credentials.
+
+Only if needed, request a local screenshot (never uploaded automatically):
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful --details --screenshot "$env:USERPROFILE\openagent-page.png"
+```
+
+Screenshots can contain **private account and chat content**. Review/redact
+the PNG yourself before sharing. Saving refuses to overwrite an existing file.
 
 ## What is implemented
 
