@@ -96,3 +96,11 @@ live automation. Never execute model instructions inside the bridge.
 - Screenshots must be explicit opt-in, local only, not overwritten, and
   reviewed by the operator before any sharing.
 - No evasion of provider authentication challenges or service limits.
+
+## v0.4.3 browser selector policy
+- On an anonymous ChatGPT homepage, visible "Log in" controls mean `login_required`
+  even if the public guest composer or Send control also appears.
+- Prefer precise UI evidence; check multiple matches because responsive sites can
+  render a hidden control before its visible equivalent.
+- Logged-out fixture tests are not live authorization or capability verification.
+- Never import/copy personal browser authentication material automatically.

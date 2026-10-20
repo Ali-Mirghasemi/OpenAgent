@@ -51,6 +51,24 @@ class PageLike(Protocol):
     def locator(self, selector: str) -> LocatorLike: ...
 
 
+async def _any_visible(page: PageLike, selector: str | None) -> bool:
+    """Check ALL candidate matches, not just the first (possibly hidden) one.
+
+    Live apps often render hidden mobile and desktop copies of a control.
+    Keeping the match search bounded prevents pathological DOM scans. Simple
+    test adapters without count()/nth() retain their existing .first contract.
+    """
+    if not selector:
+        return False
+    locator = page.locator(selector)
+    if callable(getattr(locator, "count", None)) and callable(getattr(locator, "nth", None)):
+        for index in range(min(await locator.count(), 32)):
+            if await locator.nth(index).is_visible():
+                return True
+        return False
+    return await locator.first.is_visible()
+
+
 async def inspect_ui(page: PageLike, selectors: UISelectors) -> UIObservation:
     """Check high-priority status markers before claiming UI readiness.
 
@@ -61,7 +79,7 @@ async def inspect_ui(page: PageLike, selectors: UISelectors) -> UIObservation:
         return UIObservation("browser_disconnected", "page_closed")
 
     async def visible(selector: str | None) -> bool:
-        return bool(selector and await page.locator(selector).first.is_visible())
+        return await _any_visible(page, selector)
 
     try:
         for field, state in (
@@ -102,7 +120,7 @@ async def inspect_ui_controls(page: PageLike, selectors: UISelectors) -> dict[st
             continue
         try:
             result[field] = (
-                "visible" if await page.locator(selector).first.is_visible()
+                "visible" if await _any_visible(page, selector)
                 else "not_visible"
             )
         except Exception:

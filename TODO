@@ -1,5 +1,16 @@
 # OpenAgent — TODO
 
+## v0.4.3 — Logged-out ChatGPT page
+- [x] Identify logged-out homepage from Windows screenshot and page-shape output.
+- [x] Add semantic visible login controls to the ChatGPT adapter.
+- [x] Classify login-required before treating an anonymous composer as ready.
+- [x] Test hidden and visible duplicate login controls with synthetic fixtures.
+- [ ] Confirm `browser chatgpt-status --headful --details` returns `login_required` on Windows.
+- [ ] Verify whether the user's chosen authentication method works in the managed
+  browser profile without evading provider restrictions.
+- [ ] Only test real chat submission if authenticated and permitted.
+
+
 ## v0.4.2 — Page detection follow-up
 - [x] Add bounded render wait to read-only `chatgpt-status` diagnostics.
 - [x] Inspect safe DOM shape without exporting messages, page text or credentials.

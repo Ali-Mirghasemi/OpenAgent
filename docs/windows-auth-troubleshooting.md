@@ -79,3 +79,14 @@ account and conversation data; never commit it to the repository.
 
 `browser chatgpt-status` automatically closes its diagnostic tab. Do not run
 it simultaneously with `browser open` using the same persistent profile.
+
+## ChatGPT logged out on rendered homepage (v0.4.3)
+
+If the screenshot shows a ChatGPT homepage with **Log in** at top right or in
+its sidebar, the browser is not authenticated to the ChatGPT account even when
+an editable composer is visible. The updated detector should report
+`login_required`; it must not report `ready` based only on an anonymous editor.
+OpenAgent does not transfer normal Chrome/Firefox cookies into its managed
+profile. For login in a managed browser use only authentication supported by
+that provider; OpenAgent cannot fix an identity provider's automated-browser
+restriction. Avoid repeated automated login attempts or circumventing challenges.

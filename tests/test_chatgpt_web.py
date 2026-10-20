@@ -38,6 +38,13 @@ class Locator:
             return int(self.page.pending)
         if self.selector == '.markdown':
             return 1
+        if self.selector in {
+            CHATGPT_SELECTORS.composer, CHATGPT_SELECTORS.send_button,
+            CHATGPT_SELECTORS.security_challenge,
+            CHATGPT_SELECTORS.generation_in_progress,
+            CHATGPT_SELECTORS.response_complete,
+        }:
+            return 1
         return 0
 
     async def is_visible(self):

@@ -1,4 +1,4 @@
-# OpenAgent Bridge — v0.4.2
+# OpenAgent Bridge — v0.4.3
 
 **Early Python foundation for a provider-independent AI bridge.** The v0.4.x
 release includes an opt-in, experimental ChatGPT public-UI adapter, verified
@@ -6,6 +6,24 @@ with local fixtures but **not with a live ChatGPT account**. The API serves
 `mock/echo` by default; `chatgpt-web/default` appears only if explicitly
 enabled with `--enable-chatgpt-web` and a bearer token. No automated login,
 model control, native tools, or coding-agent command execution.
+
+## New in v0.4.3 — Recognize a logged-out ChatGPT homepage
+
+A Windows screenshot showed a fully rendered ChatGPT homepage with visible
+**Log in** buttons and an anonymous message composer. In v0.4.2 this was
+misclassified as `ui_changed` because we only checked older login selectors.
+The new selector candidates recognize the login state before claiming readiness.
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful --details
+```
+
+Expected on that same logged-out layout: `state: login_required` and
+`controls.login_required: visible`. This does **not** log in or copy browser
+credentials. Authentication must occur through a provider-supported flow in
+OpenAgent's own persistent browser profile. A 200 response from `/v1/models`
+only confirms the bridge is reachable and authenticated, not that the ChatGPT
+account is logged in.
 
 ## New in v0.4.2 — diagnosing an empty ChatGPT UI
 

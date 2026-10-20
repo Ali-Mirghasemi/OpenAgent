@@ -87,3 +87,34 @@ async def test_safe_control_snapshot_when_browser_unavailable():
     assert result["composer"] == "unavailable"
     result = await inspect_ui_controls(Page(fail=True), SELECTORS)
     assert result["send_button"] == "unavailable"
+
+
+@pytest.mark.asyncio
+async def test_second_visible_login_marker_takes_priority_over_composer():
+    class ManyLocator:
+        def __init__(self, key, index=None):
+            self.key, self.index = key, index
+
+        async def count(self):
+            return 2 if self.key == '#login' else 1
+
+        def nth(self, index):
+            return ManyLocator(self.key, index)
+
+        async def is_visible(self):
+            if self.key == '#login':
+                return self.index == 1
+            return self.key in {'#composer', '#send'}
+
+    class ManyPage:
+        def is_closed(self):
+            return False
+
+        def locator(self, selector):
+            return ManyLocator(selector)
+
+    from openagent.browser.diagnostics import inspect_ui_controls
+    state = await inspect_ui(ManyPage(), SELECTORS)
+    assert state.state == 'login_required'
+    controls = await inspect_ui_controls(ManyPage(), SELECTORS)
+    assert controls['login_required'] == 'visible'

@@ -1,4 +1,4 @@
-# ChatGPT Web UI adapter preview — v0.4.1
+# ChatGPT Web UI adapter preview — v0.4.3
 
 ## Status and scope
 
@@ -96,3 +96,13 @@ If the server is on another local port, pass `--url http://127.0.0.1:PORT`.
 This command rejects non-loopback destinations to avoid forwarding a local
 secret to an arbitrary remote host. Further details in
 [windows-auth-troubleshooting.md](windows-auth-troubleshooting.md).
+
+## Anonymous homepage detection (v0.4.3)
+
+In a Windows test, the browser successfully loaded `chatgpt.com`, but the page
+showed visible **Log in** controls and an anonymous composer. v0.4.2's old
+login selectors missed them and returned `ui_changed`. v0.4.3 recognizes
+semantic login buttons/links and returns `login_required`. Do not infer that a
+visible anonymous message editor means the account is authenticated. Detection
+remains read-only, and login behavior is not automated. Google and other identity
+providers may refuse sign-in in software-controlled browser sessions.

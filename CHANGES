@@ -1,5 +1,19 @@
 # OpenAgent — Change Log
 
+## 0.4.3 — 2026-10-20
+- Identified the Windows `ui_changed` root cause from a user-provided screenshot:
+  the ChatGPT homepage rendered normally but was logged out, showing visible
+  "Log in" buttons that the selector did not recognize.
+- Updated the experimental ChatGPT public-UI selector candidates for semantic
+  login buttons/links, anonymous composer, and send controls.
+- UI diagnostics now check multiple candidate matches when the first matching
+  element is hidden (mobile/desktop duplicate controls).
+- Added a synthetic logged-out HTML fixture and regression tests verifying
+  `login_required` takes precedence over composer readiness, without submitting.
+- No automatic login, credential copying, provider-challenge bypass, or live
+  ChatGPT message submission; browser account authentication remains separate.
+
+
 ## 0.4.2 — 2026-10-20
 - Confirmed from Windows logs: authenticated /v1/models returns HTTP 200; 78 tests
   passed, but ChatGPT UI diagnostics found no visible controls.

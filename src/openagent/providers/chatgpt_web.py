@@ -27,10 +27,30 @@ CHATGPT_URL = "https://chatgpt.com/"
 # UI updates/localization can invalidate them. Always verify on the actual
 # user's account; no selector implies a particular plan or login succeeded.
 CHATGPT_SELECTORS = UISelectors(
-    composer="#prompt-textarea",
-    send_button='button[data-testid="send-button"]',
+    # Candidate selectors for the current public UI. Some logged-out pages
+    # display an editor without the old #prompt-textarea or send test ID.
+    composer=(
+        '#prompt-textarea, [data-testid="prompt-textarea"], '
+        '[contenteditable="true"][role="textbox"], '
+        'textarea[placeholder*="Ask ChatGPT" i], '
+        'textarea[placeholder*="Message" i]'
+    ),
+    send_button=(
+        'button[data-testid="send-button"], '
+        'button[aria-label="Send message"], '
+        'button[aria-label="Send prompt"]'
+    ),
     assistant_message='[data-message-author-role="assistant"]',
-    login_required='a[href*="/auth/login"], button[data-testid="login-button"]',
+    # Screenshot-verified logged-out layout (2026-10-20): plain "Log in"
+    # buttons/links appear at the top right and in the sidebar. These public
+    # controls are more useful than assuming a private data-testid exists.
+    # Keep exact text matching to avoid matching chat content or other actions.
+    login_required=(
+        'a[href*="/auth/login"], button[data-testid="login-button"], '
+        'button:text-is("Log in"), a:text-is("Log in"), '
+        '[role="button"]:text-is("Log in"), '
+        'button:text-is("Sign in"), a:text-is("Sign in")'
+    ),
     security_challenge='iframe[src*="challenges.cloudflare.com"], [id*="challenge-running"]',
     rate_limited='[data-testid="rate-limit-error"]',
     generation_in_progress='button[data-testid="stop-button"]',
