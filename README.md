@@ -1,3 +1,32 @@
+# OpenAgent Bridge v0.4.13 — Projects “Show more” button recognition
+
+Windows v0.4.12 passed 170 tests but `chatgpt-projects --load-all`
+discovered the same five Projects after four scrolls and **zero** expansion
+clicks. The old scanner rejected the generic “Show more” control if the
+Projects heading and rows were not inside a specially labeled `section`.
+
+v0.4.13 recognizes a generic Show more control when it is grouped in the DOM
+with visible Project rows and a Projects heading, including plain `<div>` / `<span>`
+layouts. It still refuses to click unrelated chat-list controls, controls
+inside a Project conversation, or ambiguous multiple matching controls.
+The passive command stays completely read-only. An opt-in `--load-all` is
+required for scrolling or expanding anything.
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-projects --headful --load-all --wait-seconds 12 --max-steps 30 --json
+```
+
+New `more_controls_seen` reports how many candidate “Show more” buttons were
+present, **before safety checks**. If the scan still reports zero expansions,
+this count can distinguish a missing button from one OpenAgent intentionally
+refused to click. It does not reveal page text outside the allowed label or
+private browsing data. `complete: false` remains intentional: sidebar
+traversal cannot prove account-wide completeness.
+
+See [Projects pagination and limits](docs/chatgpt-projects-pagination.md).
+
+---
+
 # OpenAgent Bridge v0.4.12 — More complete Projects UI inventory
 
 Windows v0.4.11 passed **165 tests** and found five Projects in the visible

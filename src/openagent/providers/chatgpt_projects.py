@@ -23,6 +23,10 @@ _ROW_SELECTOR = (
 )
 _MARKER_SELECTOR = '[data-sidebar-project-container-id^="project:g-p-"]'
 _TITLE_SELECTOR = '[data-marquee-text="true"], [data-marquee-content="true"]'
+_MORE_BUTTON_LABEL = re.compile(
+    r"^(?:show more(?: projects)?|load more(?: projects)?|see all(?: projects)?|"
+    r"view all(?: projects)?|more projects)(?:\s*\(\d+\))?$", re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -157,6 +161,7 @@ class ProjectScanReport:
     scroll_steps: int
     expand_clicks: int
     complete: bool = False
+    more_controls_seen: int = 0
 
     def as_dict(self) -> dict:
         return {
@@ -165,39 +170,84 @@ class ProjectScanReport:
             "discovered_count": len(self.projects),
             "scroll_steps": self.scroll_steps,
             "expand_clicks": self.expand_clicks,
+            "more_controls_seen": self.more_controls_seen,
             "complete": False,
             "note": "Best-effort visible UI scan; the site does not expose a verified total.",
         }
 
 
 async def _expand_projects_more(page) -> bool:
-    """Click only an unmistakable Projects-list expansion control in navigation.
+    """Expand a *Project-list* Show more, never an unrelated sidebar control.
 
-    Never click a Project, a chat, a generic 'Show more' elsewhere, or an
-    ambiguous control. This function is only called with explicit --load-all.
+    Some ChatGPT layouts have a generic ``Show more`` button beneath the
+    Projects heading but no semantic ``section`` wrapper. The old detector
+    rejected these. A generic label is accepted only if it belongs to a
+    bounded DOM group containing both a Projects heading and observed Project
+    rows, or a group explicitly marked as a Projects list. Merely being
+    somewhere in a navigation sidebar is **not** sufficient.
+
+    If several equally eligible buttons remain, don't guess. This may be
+    called only by the user-opted-in ``--load-all`` inventory command.
     """
-    buttons = page.get_by_role("button", name=re.compile(
-        r"^(?:show more projects|load more projects|see all projects|view all projects|more projects|"
-        r"show more|load more|see all|view all)$", re.IGNORECASE,
-    ))
-    for index in range(min(await buttons.count(), 40)):
+    buttons = page.get_by_role("button", name=_MORE_BUTTON_LABEL)
+    explicit = []
+    grouped = []
+    for index in range(min(await buttons.count(), 60)):
         button = buttons.nth(index)
         if not await button.is_visible() or not await button.is_enabled():
             continue
-        safe = await button.evaluate("""element => {
-            const insideNavigation = !!element.closest('aside,nav,[role="navigation"],[data-testid*="sidebar"]');
-            if (!insideNavigation) return false;
-            const name = (element.getAttribute('aria-label') || element.textContent || '').trim();
-            if (/projects/i.test(name)) return true;
-            // Generic "Show more" requires an *explicit* Projects section.
-            return !!element.closest('section[data-testid*="project"],section[aria-label="Projects"],'
-                + '[data-testid="projects-section"],[data-sidebar-section="projects"]');
+        classification = await button.evaluate("""element => {
+            const nav = element.closest('aside,nav,[role="navigation"],[data-testid*="sidebar"]');
+            if (!nav) return 0;
+            // Do not expand a *conversation* list inside an individual Project.
+            if (element.closest('[data-sidebar-project-container-id^="project:g-p-"],'
+                + '[role="button"][aria-expanded]:has([data-sidebar-project-container-id^="project:g-p-"])'))
+                return 0;
+            const name = (element.getAttribute('aria-label') || element.textContent || '')
+                .replace(/\\s+/g, ' ').trim();
+            // Explicit 'Show more projects' is unambiguous within navigation.
+            if (/^(show more|load more|see all|view all|more) projects(?: \\(\\d+\\))?$/i.test(name))
+                return 2;
+            // Generic 'Show more' must be LOCAL to the Projects list.
+            let parent = element.parentElement;
+            for (let depth = 0; depth < 7 && parent && parent !== nav; depth++, parent = parent.parentElement) {
+                if (!parent.querySelector('[data-sidebar-project-container-id^="project:g-p-"]'))
+                    continue;
+                const attr = ((parent.getAttribute('data-testid') || '') + ' ' +
+                    (parent.getAttribute('data-sidebar-section') || '') + ' ' +
+                    (parent.getAttribute('aria-label') || '')).toLowerCase();
+                const marked = /projects|project-list|project-section/.test(attr);
+                // Some layouts use only div/span headings instead of a <section>.
+                const headings = parent.querySelectorAll('h1,h2,h3,h4,h5,h6,[role="heading"],span,div,button');
+                let hasHeading = false;
+                for (const heading of headings) {
+                    if (heading !== element && heading.textContent.trim() === 'Projects' &&
+                        !heading.closest('[data-sidebar-project-container-id^="project:g-p-"]')) {
+                        hasHeading = true;
+                        break;
+                    }
+                }
+                if (marked || hasHeading) {
+                    const markers = parent.querySelectorAll('[data-sidebar-project-container-id^="project:g-p-"]');
+                    // The control should be after the Project rows, not above
+                    // an unrelated part of the navigation.
+                    const last = markers[markers.length - 1];
+                    if (last && (last.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING))
+                        return 1;
+                }
+            }
+            return 0;
         }""")
-        if not safe:
-            continue
-        await button.click(timeout=2000)
-        return True
-    return False
+        if classification == 2:
+            explicit.append(button)
+        elif classification == 1:
+            grouped.append(button)
+    # Prefer a positively named control over a contextual/generic one.
+    candidates = explicit if explicit else grouped
+    if len(candidates) != 1:
+        return False
+    await candidates[0].click(timeout=2000)
+    return True
 
 
 async def _scroll_projects_navigation(page) -> bool:
@@ -247,6 +297,7 @@ async def scan_chatgpt_projects(page, *, origin: str = "https://chatgpt.com",
     found: dict[str, ChatGPTProject] = {p.id: p for p in projects}
     clicks = 0
     scrolls = 0
+    more_controls_seen = 0
     # Origin checked again before each UI action (a SPA can navigate meanwhile).
     async def collect() -> None:
         for project in await discover_chatgpt_projects(page, origin=origin):
@@ -260,7 +311,11 @@ async def scan_chatgpt_projects(page, *, origin: str = "https://chatgpt.com",
                 break
         except (ValueError, BrowserNavigationError, TypeError, AttributeError):
             break
-        # Scroll first; a click can itself scroll and unmount old virtualized rows.
+        more_controls_seen = max(more_controls_seen, await page.get_by_role(
+            "button", name=_MORE_BUTTON_LABEL).count())
+        # Preserve rows before any scroll-driven virtualization. In some
+        # layouts clicking the button would auto-scroll it into view and
+        # replace the currently mounted rows before we can collect them.
         moved = await _scroll_projects_navigation(page)
         if moved:
             scrolls += 1
@@ -273,4 +328,5 @@ async def scan_chatgpt_projects(page, *, origin: str = "https://chatgpt.com",
             await collect()
         if not expanded and not moved or len(found) >= 1000:
             break
-    return ProjectScanReport(tuple(found.values()), initial_count, scrolls, clicks)
+    return ProjectScanReport(tuple(found.values()), initial_count, scrolls, clicks,
+                             more_controls_seen=more_controls_seen)

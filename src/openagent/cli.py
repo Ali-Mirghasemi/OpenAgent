@@ -370,6 +370,7 @@ async def _chatgpt_projects(args: argparse.Namespace) -> int:
             print(f"Discovered ChatGPT projects: {len(projects)}")
             if args.load_all:
                 print(f"UI scan: {report.scroll_steps} scrolls, {report.expand_clicks} explicit expansions")
+                print(f"Show more controls detected: {report.more_controls_seen} (before safety checks)")
                 print("Best-effort inventory only; completeness is NOT verified.")
             else:
                 print("Only currently rendered sidebar links/rows are reported; use --load-all to scan more.")

@@ -1,3 +1,17 @@
+## v0.4.13 — Show more Projects control
+- [x] Verify v0.4.12 on Windows: 170 tests, five projects, four scrolls, no clicks.
+- [x] Scope generic Show more buttons using the nearest Projects heading and
+      observed project rows, not just a semantic section wrapper.
+- [x] Reject ambiguous controls and unrelated chat/conversation expansion.
+- [x] Expose count-only Show more diagnostics in scan JSON/CLI.
+- [x] Add Chromium tests for plain div wrappers, unrelated buttons and ambiguity.
+- [ ] Verify v0.4.13 `--load-all` on the user's signed-in Windows profile.
+- [ ] If zero expansion clicks persist, compare the browser's rendered
+      Projects control structure using explicitly redacted local diagnostics.
+- [ ] Verify Project-scoped route before binding a Project to a local session.
+- [ ] Model/effort selection, file transfers, conversation lifecycle,
+      OpenCode/9Router, additional provider adapters, and coding agent.
+
 ## v0.4.12 — Project inventory beyond initially mounted rows
 - [x] Verify v0.4.11 on Windows (165 tests, five visible Project rows).
 - [x] Add explicit `--load-all` with bounded sidebar scrolling and specific

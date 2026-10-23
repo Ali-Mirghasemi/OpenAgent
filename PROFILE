@@ -1,3 +1,13 @@
+## v0.4.13 Projects expansion boundary
+- “Show more” may be a generic sidebar button without a semantic Projects
+  wrapper. Infer a Projects list only from locally grouped Projects heading,
+  visible observed Project rows, and an in-group control after those rows.
+- Do not click arbitrary Show more controls based solely on navigation/sidebar
+  membership; reject multiple equivalent candidates rather than guessing.
+- Keep normal Project discovery passive and make scrolling/expansion explicit.
+- A discovered Project ID is metadata only. Never assume its candidate URL
+  permits Project-scoped submission or chat continuation without verification.
+
 ## v0.4.12 best-effort Projects scan
 - Default inventory is non-interacting; opt-in `--load-all` may scroll a
   strictly scoped sidebar and click only positively named Project-list expansion

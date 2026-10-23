@@ -1,3 +1,17 @@
+## 0.4.13 — 2026-10-23
+- Windows v0.4.12: 170 tests passed; five Projects found, four sidebar
+  scrolls, zero expansion clicks despite a user-visible “Show more” control.
+- Recognize generic “Show more” controls grouped with a Projects heading and
+  Project rows even when no specially marked Projects section exists.
+- Reject generic More controls elsewhere in navigation, inside Project rows,
+  or in an ambiguous multiple-control group; passive scanning never clicks.
+- Report `more_controls_seen` for safe, count-only diagnosis of rejected or
+  missing expansion controls. No real account was automated by release tests.
+- Add actual Chromium regression fixture for plain-div Projects layout,
+  unrelated Show more traps and multiple ambiguous controls.
+- Project selection, model/effort, file handling and OpenCode integration
+  remain future, separately validated milestones.
+
 ## 0.4.12 — 2026-10-23
 - User confirmed v0.4.11 on Windows: 165 tests, 5 discovered sidebar Projects,
   with additional Projects known to exist.

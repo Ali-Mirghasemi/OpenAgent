@@ -1,4 +1,4 @@
-# ChatGPT Projects — best-effort sidebar pagination (v0.4.12)
+# ChatGPT Projects — best-effort sidebar pagination (v0.4.13)
 
 ## Why five isn't all
 
@@ -42,3 +42,22 @@ names or IDs unless needed; redact before pasting diagnostics.
 No live ChatGPT account/project routing behavior is certified by local
 fixture tests. Project selection, project-specific chat scope, effort/model
 control, attachments, and OpenCode/9Router remain separate milestones.
+
+## v0.4.13: generic “Show more” controls
+
+Some 2026 sidebar designs put `Show more` next to the Projects heading and
+observed Project rows without a `section` or `aria-label="Projects"` wrapper.
+`--load-all` now accepts that grouped layout, but only if the button follows
+observed Projects and is within their local DOM group; a generic More button
+somewhere else in navigation still fails the safety check.
+
+The `more_controls_seen` JSON field is the maximum count of accessible “Show
+more” candidate buttons seen during the scan, **before** scoping and
+ambiguity checks. `expand_clicks=0` with `more_controls_seen>0` means buttons
+were present but not approved by the conservative matcher. `0/0` can mean the
+site uses a different control name/role or the Projects UI was not mounted.
+Avoid sharing full page HTML or browser traces with session data; a redacted
+screenshot of the relevant sidebar is a safer next diagnostic.
+
+The scanner never proves it retrieved every Project (`complete: false`),
+and never selects Project context, accesses files, or submits messages.

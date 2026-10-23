@@ -1,0 +1,37 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Local generic Show more Projects fixture</title></head><body>
+<aside aria-label="ChatGPT navigation" style="height:260px;overflow-y:auto;border:1px solid #999">
+  <div id="project-cluster">
+    <div class="section-header"><span>Projects</span></div>
+    <div id="project-rows"></div>
+    <div id="project-more-wrap"><button id="project-show-more" type="button">Show more</button></div>
+  </div>
+  <section aria-label="Recents">
+    <h3>Recents</h3><button id="unrelated-show-more" type="button">Show more</button>
+  </section>
+  <div style="height:260px"></div>
+</aside>
+<button type="button" id="outside-more">Show more projects</button>
+<script>
+  window.projectMoreClicks = 0;
+  window.unrelatedMoreClicks = 0;
+  window.outsideMoreClicks = 0;
+  window.sendClicks = 0;
+  const rows = document.getElementById('project-rows');
+  function add(i) {
+    const row = document.createElement('div');
+    row.setAttribute('role', 'button'); row.setAttribute('aria-expanded', 'false');
+    row.innerHTML = '<div data-sidebar-project-container-id="project:g-p-' + i.toString(16).padStart(32,'0') + '"><span data-marquee-text="true">Project ' + i + '</span></div>';
+    row.style.height = '25px';
+    rows.appendChild(row);
+  }
+  for(let i=1;i<=5;i++) add(i);
+  document.querySelector('#project-show-more').onclick = function () {
+    window.projectMoreClicks++;
+    // Some UI versions mount more project rows asynchronously.
+    setTimeout(() => {for(let i=6;i<=11;i++) add(i);}, 100);
+    this.remove();
+  };
+  document.querySelector('#unrelated-show-more').onclick = () => window.unrelatedMoreClicks++;
+  document.querySelector('#outside-more').onclick = () => window.outsideMoreClicks++;
+</script>
+</body></html>
