@@ -1,3 +1,26 @@
+## v0.4.20 Reply text and correction boundary (2026-10-23)
+- Windows v0.4.19 successfully reconciled original `project-test-001`, but
+  stored the accessibility heading `ChatGPT said:` instead of the actual answer.
+- A completed turn is not evidence that its captured text is the assistant body.
+  Label-only content must fail closed during ordinary generation and recovery.
+- Text from a sibling is eligible only if it belongs to the SAME `data-turn-key`
+  grouping and comes AFTER the marked assistant role; never read sidebar text.
+- Correcting an already-committed last Project turn requires a fresh, read-only
+  remote verification, exact original prompt hash, immutable Project and upstream
+  identity, one-time atomic update and an audit hash; never resend the request.
+- Live correction still needs Windows verification; Project/effort/files/agents
+  remain follow-on milestones.
+
+## v0.4.19 Recovery DOM marker fallbacks (2026-10-23)
+- User verified 219 tests on Windows in v0.4.18, but `reconcile-check` returns
+  `reconcile_user_turn_missing` despite previously visible completed chat.
+- The recovery inspector now recognizes article `data-turn=user`, `data-user-message-bubble`
+  and `data-conversation-role` markers in addition to classic user role nodes.
+- Read-only `reconcile-dom-check` reports bounded counts, not contents or URLs.
+- Only the exact original unknown request in a verified Project can be inspected;
+  no blind retry, cookie extraction or remote send.
+- Next verify against Windows live DOM before any further Project turn.
+
 ## v0.4.18 Project recovery diagnostics (2026-10-23)
 - Unknown turns are immutable until the original user message, Project route,
   most recent assistant ordering and completed response are positively verified.

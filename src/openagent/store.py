@@ -11,6 +11,7 @@ from typing import Any
 
 from .models import Message, ProviderOutput, valid_upstream_id
 from .providers.chatgpt_projects import parse_project_url
+from .providers.reply_text import is_role_label_only, is_trustworthy_answer
 
 
 class SessionNotFound(KeyError):
@@ -53,6 +54,14 @@ class SessionStore:
                 response TEXT,
                 payload_hash TEXT,
                 PRIMARY KEY (session_id, request_id)
+            );
+            CREATE TABLE IF NOT EXISTS turn_corrections (
+                session_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                previous_content_sha256 TEXT NOT NULL,
+                corrected_at TEXT NOT NULL,
+                PRIMARY KEY (session_id, request_id),
+                FOREIGN KEY (session_id, request_id) REFERENCES turns(session_id, request_id)
             );
         """)
         # Backward-compatible migration for existing v0.4.7 databases.
@@ -236,6 +245,82 @@ class SessionStore:
                 "UPDATE turns SET status='done',response=? WHERE session_id=? AND request_id=? AND status=?",
                 (json.dumps(payload), session_id, request_id, status_required),
             )
+        return payload
+
+    def require_repairable_project_turn(self, session_id: str, request_id: str,
+                                        user: Message, *, expected_project_id: str) -> None:
+        """A completed but label-only final answer can be repaired exactly once.
+
+        Check without changing the journal. This check is repeated under
+        BEGIN IMMEDIATE when committing to reject competing writes.
+        """
+        digest = hashlib.sha256(json.dumps(user.model_dump(
+            mode="json", exclude_none=True), sort_keys=True).encode()).hexdigest()
+        session = self.db.execute("SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone()
+        if session is None:
+            raise SessionNotFound(session_id)
+        if session["model"] != "chatgpt-web/default" or session["project_id"] != expected_project_id:
+            raise SessionBusy("Project repair requires the original bound model and Project")
+        if not session["upstream_conversation_id"]:
+            raise SessionBusy("Project repair requires a recorded upstream conversation")
+        last = self.db.execute(
+            "SELECT request_id,status,response,payload_hash FROM turns WHERE session_id=? ORDER BY rowid DESC LIMIT 1",
+            (session_id,),
+        ).fetchone()
+        if (last is None or last["request_id"] != request_id or last["status"] != "done"
+            or last["payload_hash"] != digest or not last["response"]):
+            raise SessionBusy("Only the most recent completed identical Project turn can be repaired")
+        old = json.loads(last["response"])
+        entries = json.loads(session["messages"])
+        if (not is_role_label_only(old.get("content") or "") or
+            old.get("upstream_conversation_id") != session["upstream_conversation_id"] or
+            len(entries) < 2 or
+            entries[-2] != user.model_dump(mode="json", exclude_none=True) or
+            entries[-1].get("role") != "assistant" or
+            entries[-1].get("content") != old["content"]):
+            raise SessionBusy("Saved answer is not the expected label-only last assistant turn")
+        if self.db.execute(
+            "SELECT 1 FROM turn_corrections WHERE session_id=? AND request_id=?",
+            (session_id, request_id),
+        ).fetchone():
+            raise SessionBusy("Project turn was already corrected")
+
+    def repair_project_turn(self, session_id: str, request_id: str, user: Message,
+                            output: ProviderOutput, *, expected_project_id: str) -> dict[str, Any]:
+        """One-time CAS update of a label-only reply, never a new remote send.
+
+        The remote check happens before entering this transaction. We recheck
+        session/turn identity atomically, update transcript and cache together,
+        and retain a SHA-256 audit fingerprint of the old label-only content.
+        """
+        if (not is_trustworthy_answer(output.content) or
+            output.content.casefold().startswith(("chatgpt said:", "chatgpt says:",
+                                                   "assistant said:", "assistant says:")) or
+            output.tool_calls):
+            raise SessionBusy("The new answer is not verified user-visible content")
+        with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            self.require_repairable_project_turn(session_id, request_id, user,
+                                                 expected_project_id=expected_project_id)
+            row = self.db.execute("SELECT messages,upstream_conversation_id FROM sessions WHERE id=?",
+                                  (session_id,)).fetchone()
+            if output.upstream_conversation_id != row["upstream_conversation_id"]:
+                raise SessionBusy("Conversation identity changed during Project repair")
+            old = self.db.execute(
+                "SELECT response FROM turns WHERE session_id=? AND request_id=?", (session_id, request_id)
+            ).fetchone()
+            previous = json.loads(old["response"])
+            entries = json.loads(row["messages"])
+            entries[-1]["content"] = output.content
+            now = utcnow()
+            self.db.execute("UPDATE sessions SET messages=?,updated_at=? WHERE id=?",
+                            (json.dumps(entries), now, session_id))
+            payload = output.model_dump(mode="json")
+            self.db.execute("UPDATE turns SET response=? WHERE session_id=? AND request_id=?",
+                            (json.dumps(payload), session_id, request_id))
+            self.db.execute("INSERT INTO turn_corrections VALUES (?,?,?,?)",
+                (session_id, request_id,
+                 hashlib.sha256(previous["content"].encode()).hexdigest(), now))
         return payload
 
     def fail_turn(self, session_id: str, request_id: str) -> None:

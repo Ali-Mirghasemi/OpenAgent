@@ -1,3 +1,63 @@
+### v0.4.20: repair a previously recorded accessibility-label reply (experimental)
+
+Windows v0.4.19 verified the original Project turn and saved its conversation
+ID, but returned **`ChatGPT said:`** as the assistant response rather than the
+visible answer. That is an accessibility *heading*, not a usable model reply.
+The provider now requires answer-shaped content inside the assistant marker or
+following it inside the same logical turn (`data-turn-key`). It rejects label-only
+content instead of silently recording it. Both initial response capture and
+manual reconciliation use this safer extraction.
+
+For a *completed* local turn with this exact label-only stored answer, two
+new authenticated endpoints exist: `POST /openagent/sessions/{id}/turns/{request_id}/repair-check`
+(read-only) and `/repair` (explicit one-time correction). Use **the same JSON
+body** as the earlier `/reconcile` call: `conversation_url` and the *exact*
+original `message`. The repair path requires the original Project binding,
+upstream chat ID, last completed request, exact request hash and unchanged
+visible completed answer. It never types or clicks Send, cannot change earlier
+turns, and rechecks everything transactionally. A correction is logged in the
+`turn_corrections` table (SHA-256 fingerprint of the old label, no secret text).
+
+Example with the previously defined `$base`, `$headers`, `$sid`, `$requestId`
+and `$recoveryBody` from the v0.4.19 instructions:
+
+```powershell
+$check = Invoke-RestMethod -Uri "$base/openagent/sessions/$sid/turns/$requestId/repair-check" -Method Post -Headers $headers -ContentType 'application/json' -Body $recoveryBody -TimeoutSec 45
+$check | ConvertTo-Json -Depth 10
+if ($check.correctable) {
+  Invoke-RestMethod -Uri "$base/openagent/sessions/$sid/turns/$requestId/repair" -Method Post -Headers $headers -ContentType 'application/json' -Body $recoveryBody -TimeoutSec 45
+}
+```
+
+**Do not call `/reconcile` again** on this completed request and do not resend
+it. If `repair-check` reports `reconcile_assistant_content_unverified`, the
+live DOM still lacks a safely identifiable answer; do not guess or hand-edit the
+SQLite DB. Report that finite reason code and examine the UI locally.
+This is fixture-tested only; real ChatGPT correction is not yet confirmed.
+
+### v0.4.19: inspect missing Project user-turn markers without sending
+
+Windows v0.4.18 reports `reconcile_user_turn_missing` while the completed reply is
+visible in an earlier screenshot. The recovery verifier now checks exact
+role-bearing message, article and user-bubble markers in the currently rendered
+ChatGPT DOM. It still requires the original user text, subsequent assistant,
+stable reply, and assistant-scoped completion evidence to reconcile an unknown turn.
+
+For the exact still-unknown Project request, the new authenticated
+`POST /openagent/sessions/{id}/turns/{request_id}/reconcile-dom-check`
+uses the same JSON body as `/reconcile-check` and returns *counts only*.
+Example (use your own valid values):
+
+```powershell
+$dom = Invoke-RestMethod -Uri "$base/openagent/sessions/$sid/turns/$requestId/reconcile-dom-check" -Method Post -Headers $headers -ContentType "application/json" -Body $recoveryBody -TimeoutSec 45
+$dom | ConvertTo-Json -Depth 10
+```
+
+The result never includes message text, cookies or URLs. It is read-only and
+requires matching Project binding, original message hash, and an `unknown` turn.
+Run `/reconcile-check` again after inspection. Reconcile only if it returns
+`verifiable: true`; never resend the original request.
+
 ### v0.4.18: diagnose an unresolved Project reply without resubmitting
 
 The first live Project prompt was answered in ChatGPT, but recovery on the

@@ -1,3 +1,37 @@
+## 0.4.20 — 2026-10-23
+- Windows v0.4.19: 225 tests passed. The previously unknown first Project turn
+  was read-only reconciled and its chat ID persisted, but the stored answer was
+  the accessibility heading `ChatGPT said:` rather than the visible actual reply.
+- Restrict assistant extraction to visible content inside the marked answer or
+  following it in the same logical `data-turn-key` group; reject accessibility
+  headings and ambiguous candidates instead of persisting them as completions.
+- Use the safer extraction in normal ChatGPT turn capture as well as recovery;
+  recognize the public `data-conversation-role=assistant` role marker.
+- Add separate authenticated `/repair-check` and one-time `/repair` for the
+  *last done Project request whose recorded answer is a role label only*.
+  Require the same original message, same Project and upstream conversation,
+  a freshly verified completed remote answer and an atomic SQLite compare-and-swap.
+  Keep an audit fingerprint in the new additive `turn_corrections` table.
+- Tests include actual Chromium role-label and sibling-answer fixtures,
+  no-sibling fail-closed paths, and storage/API correction and restart cases.
+- No change to provider automation permissions, model selection, attachment
+  support or tool execution; no automatic resubmission or automatic correction.
+
+## 0.4.19 — 2026-10-23
+- Windows v0.4.18 passed 219 tests. Read-only recovery of the known answered Project
+  request remains blocked with `reconcile_user_turn_missing`; no original turn was changed.
+- Broaden the *read-only* Project reconciliation selector families to prefer exact
+  role-marked user/assistant nodes, then article-level roles and marked user bubbles
+  for modern grouped turn-key layouts. Never match arbitrary sidebar/page text.
+- Extract only the last marked user bubble for exact prompt verification, then
+  require a subsequent assistant, nonempty stable reply, idle generation and
+  turn-scoped completion evidence. Grouped Copy controls must follow the answer.
+- Add `/reconcile-dom-check`: authenticated, session-journal-gated, count-only DOM
+  marker census with strict same-Project route checks and no message text or IDs.
+  Never writes local history or sends an upstream message.
+- Tests include real Chromium old/article/grouped DOM fixtures, false-positive
+  Copy controls, and read-only API checks. Live recovery is not yet verified.
+
 ## 0.4.18 — 2026-10-23
 - User verified v0.4.17 on Windows (215 tests). Recovery of the successfully
   answered Project request still returned HTTP 409 and left the journal unknown.

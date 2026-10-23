@@ -1,3 +1,18 @@
+## v0.4.19: read-only DOM selector diagnosis
+
+The original Windows v0.4.16 Project prompt was submitted and answered, but its
+local turn was marked unknown. v0.4.18 reported `reconcile_user_turn_missing`.
+The verifier now recognizes additional role-bearing article and bubble markers,
+while requiring the *last marked* user prompt to match exactly and a later
+completed assistant turn. It does not use a generic text scan.
+
+`POST /openagent/sessions/{session_id}/turns/{request_id}/reconcile-dom-check`
+accepts the same body as `/reconcile-check`. It returns bounded, text-free
+counts of user/assistant role markers, article turns, `data-user-message-bubble`,
+`data-turn-key`, and Copy controls. It never sends, uploads, or edits SQLite.
+The endpoint checks the journal's exact unknown message and Project binding
+before visiting a strict same-Project conversation URL.
+
 # Experimental Project-scoped session routing — v0.4.16
 
 ## Preflight and gated submission

@@ -22,6 +22,7 @@ from ..capabilities import Capabilities, Feature
 from ..models import Message, ProviderOutput
 from .browser_ui import BrowserSiteProfile, BrowserUIError, BrowserUIProvider, serialize_messages
 from .turn_identity import TurnBaseline, find_new_turn, snapshot_turns
+from .reply_text import is_trustworthy_answer
 from .chatgpt_projects import (
     ChatGPTProject, parse_project_url, verify_chatgpt_project_destination,
 )
@@ -48,7 +49,7 @@ CHATGPT_SELECTORS = UISelectors(
         'button[aria-label="Send prompt"], '
         'button[aria-label*="Send" i]'
     ),
-    assistant_message='[data-message-author-role="assistant"]',
+    assistant_message='[data-message-author-role="assistant"], main [data-conversation-role="assistant"]',
     # Screenshot-verified logged-out layout (2026-10-20): plain "Log in"
     # buttons/links appear at the top right and in the sidebar. These public
     # controls are more useful than assuming a private data-testid exists.
@@ -78,6 +79,113 @@ TURN_PENDING = (
     '[aria-busy="true"], [class*="loading-shimmer"],'
     ' [class*="result-thinking"]'
 )
+
+# Read-only recovery is intentionally anchored to role-bearing turn markers,
+# never to arbitrary page text or the sidebar.  Newer ChatGPT renderers may
+# place the role on an article or a bubble rather than the message div.
+RECOVERY_USER_SELECTORS = (
+    '[data-message-author-role="user"]',
+    'article[data-turn="user"]',
+    '[data-testid^="conversation-turn-"][data-turn="user"]',
+    'main [data-conversation-role="user"]',
+    'main [data-user-message-bubble]',
+)
+RECOVERY_ASSISTANT_SELECTORS = (
+    '[data-message-author-role="assistant"]',
+    'article[data-turn="assistant"]',
+    '[data-testid^="conversation-turn-"][data-turn="assistant"]',
+    'main [data-conversation-role="assistant"]',
+)
+# Deliberately limited to count-only signals; do not return page text or IDs.
+RECOVERY_DOM_MARKERS = {
+    "user_role": '[data-message-author-role="user"]',
+    "user_article": 'article[data-turn="user"]',
+    "user_bubble": 'main [data-user-message-bubble]',
+    "user_conversation_role": 'main [data-conversation-role="user"]',
+    "assistant_role": '[data-message-author-role="assistant"]',
+    "assistant_article": 'article[data-turn="assistant"]',
+    "assistant_conversation_role": 'main [data-conversation-role="assistant"]',
+    "assistant_start": 'main [data-chatgpt-agent-turn-start]',
+    "turn_key": 'main [data-turn-key]',
+    "conversation_articles": 'main [data-testid^="conversation-turn-"]',
+    "copy_actions": TURN_COPY_BUTTON,
+}
+
+
+async def _recovery_last_marked_turn(page: Any, selectors: tuple[str, ...]) -> Any | None:
+    """Select the last node from the most specific available role-bearing family.
+
+    Selectors are ordered to prefer established message roles.  Never fall
+    back to a text-only search that could match sidebar or unrelated content.
+    """
+    for css in selectors:
+        matches = page.locator(css)
+        if await matches.count():
+            return matches.last
+    return None
+
+
+async def _recovery_user_text(turn: Any) -> str:
+    """Read only the user bubble, excluding adjacent Edit/action controls."""
+    for css in ('[data-user-message-bubble]', '.whitespace-pre-wrap', '.user-message-bubble-color'):
+        content = turn.locator(css)
+        if await content.count():
+            return ' '.join((await content.first.inner_text()).split())
+    return ' '.join((await turn.inner_text()).split())
+
+
+async def _recovery_assistant_text(assistant: Any) -> str:
+    """Extract *answer content*, not the assistant's accessibility role label.
+
+    A newer ChatGPT renderer can use [data-conversation-role=assistant]
+    solely as a spoken label ("ChatGPT said:") while placing the actual
+    markdown as a sibling inside the same logical [data-turn-key] container.
+    Only inspect visible, answer-shaped nodes belonging to that SAME turn,
+    and only when they are inside or DOM-after the assistant role marker.
+    Never use a page-wide markdown search or a sibling from another turn.
+    """
+    selector = '.markdown, [data-message-content], [data-testid="assistant-message-content"]'
+    candidate_texts: list[str] = []
+
+    async def collect(nodes: Any, *, reference: Any | None = None) -> None:
+        for index in range(min(32, await nodes.count())):
+            node = nodes.nth(index)
+            if reference is not None:
+                # A markdown block belonging to the earlier user prompt, even
+                # in the same group, must never become the assistant answer.
+                handle = await node.element_handle()
+                ref_handle = await reference.element_handle()
+                follows = await node.evaluate("""(node, role) =>
+                    !!(node && role && (role.contains(node) ||
+                    (role.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)))
+                """, ref_handle)
+                if not follows:
+                    continue
+            if not await node.is_visible():
+                continue
+            text = (await node.inner_text()).strip()
+            if is_trustworthy_answer(text) and text not in candidate_texts:
+                candidate_texts.append(text)
+
+    await collect(assistant.locator(selector))
+    if not candidate_texts:
+        grouped = assistant.locator('xpath=ancestor::*[@data-turn-key][1]')
+        if await grouped.count():
+            await collect(grouped.first.locator(selector), reference=assistant)
+    if len(candidate_texts) == 1:
+        return candidate_texts[0]
+    if len(candidate_texts) > 1:
+        raise BrowserUIError('reconcile_assistant_content_ambiguous',
+                             'Multiple competing assistant content blocks')
+
+    # Simple role-marked fixtures (and some older UIs) put the visible answer
+    # directly in the role node, without a .markdown wrapper. Only accept it
+    # if it is clearly more than a role heading or accessibility announcement.
+    raw = (await assistant.inner_text()).strip()
+    if is_trustworthy_answer(raw) and not raw.casefold().startswith(("chatgpt said:", "chatgpt says:", "assistant said:", "assistant says:")):
+        return raw
+    raise BrowserUIError('reconcile_assistant_content_unverified',
+                         'Assistant content could not be distinguished from a role label')
 
 
 def parse_chatgpt_conversation_id(url: str, *, expected_origin: str = "https://chatgpt.com") -> str | None:
@@ -383,6 +491,58 @@ class ChatGPTWebProvider(BrowserUIProvider):
                 if page is not None:
                     await self.browser.close_tab(tab_id)
 
+    async def inspect_project_conversation_dom(
+        self, *, project_id: str, conversation_url: str,
+    ) -> dict[str, Any]:
+        """Read-only marker census for a manually supplied same-Project chat.
+
+        No prompt text, DOM HTML, tokens, cookies, URLs, IDs or message bodies
+        appear in the result. No Send interactions or local DB modifications.
+        """
+        if not (self.supports_project_messages and self.supports_upstream_conversations):
+            raise BrowserUIError("project_messages_disabled", "Project inspection is disabled")
+        origin = _origin(self.site.url)
+        expected_chat = parse_project_conversation_id(
+            conversation_url, project_id, expected_origin=origin)
+        if expected_chat is None:
+            raise BrowserUIError("reconcile_invalid_input", "Invalid Project conversation route")
+        async with self._turn_lock:
+            await self.browser.start()
+            tab_id = "project-dom-inspect-" + uuid.uuid4().hex
+            page = None
+            try:
+                page = await self.browser.open_tab(tab_id, conversation_url)
+                deadline = time.monotonic() + min(8.0, self.site.timeout_s)
+                counts: dict[str, int] = {}
+                previous = None
+                stable = 0
+                while True:
+                    if parse_project_conversation_id(page.url, project_id, expected_origin=origin) != expected_chat:
+                        raise BrowserUIError("reconcile_route_mismatch", "Project conversation navigation changed")
+                    state = await inspect_ui(page, self.site.selectors)
+                    if state.state in ("login_required", "security_challenge", "rate_limited", "browser_disconnected"):
+                        raise BrowserUIError("reconcile_page_unavailable", "Project page unavailable")
+                    counts = {name: min(999, await page.locator(css).count())
+                              for name, css in RECOVERY_DOM_MARKERS.items()}
+                    if counts == previous:
+                        stable += 1
+                    else:
+                        stable, previous = 1, counts.copy()
+                    if stable >= 3 or time.monotonic() >= deadline:
+                        break
+                    await asyncio.sleep(self.site.poll_s)
+                return {"route_verified": True, "markers": counts,
+                        "submitted": False, "journal_changed": False}
+            except BrowserUIError:
+                raise
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                raise BrowserUIError("reconcile_dom_unavailable", "Project DOM could not be inspected") from exc
+            finally:
+                if page is not None:
+                    await self.browser.close_tab(tab_id)
+
     async def reconcile_project_turn(
         self, *, project_id: str, project_name: str,
         conversation_url: str, user_message: str,
@@ -420,19 +580,18 @@ class ChatGPTWebProvider(BrowserUIProvider):
                     state = await inspect_ui(page, self.site.selectors)
                     if state.state in ("login_required", "security_challenge", "rate_limited", "browser_disconnected"):
                         raise BrowserUIError("reconcile_page_unavailable", "Project page unavailable")
-                    users = page.locator('[data-message-author-role="user"]')
-                    assistants = page.locator(self.site.selectors.assistant_message)
-                    if not await users.count():
+                    user = await _recovery_last_marked_turn(page, RECOVERY_USER_SELECTORS)
+                    assistant = await _recovery_last_marked_turn(page, RECOVERY_ASSISTANT_SELECTORS)
+                    if user is None:
                         stage = "user_turn_missing"
-                    elif not await assistants.count():
+                    elif assistant is None:
                         stage = "assistant_turn_missing"
                     else:
-                        user = users.last
-                        assistant = assistants.last
-                        # Prefer exact content over user-turn wrapper text that
-                        # can contain Edit controls in some responsive layouts.
+                        # The user message must be the *last marked* user turn,
+                        # with exact text, and followed by a completed answer.
+                        # An older identical prompt is not sufficient proof.
                         expected_text = " ".join(user_message.split())
-                        actual_text = " ".join((await user.inner_text()).split())
+                        actual_text = await _recovery_user_text(user)
                         if actual_text != expected_text:
                             stage = "user_text_mismatch"
                         else:
@@ -447,13 +606,13 @@ class ChatGPTWebProvider(BrowserUIProvider):
                             else:
                                 copy_ready = await self._turn_copy_ready(assistant)
                                 pending = await assistant.locator(TURN_PENDING).count() > 0
-                                markdown = assistant.locator('.markdown')
-                                answer = ((await markdown.first.inner_text()) if await markdown.count()
-                                          else (await assistant.inner_text())).strip()
-                                if not answer:
-                                    stage = "assistant_text_empty"
+                                try:
+                                    answer = await _recovery_assistant_text(assistant)
+                                except BrowserUIError as extraction_error:
+                                    stage = extraction_error.code.removeprefix("reconcile_")
                                     previous, stable = None, 0
-                                else:
+                                    answer = ""
+                                if answer:
                                     if answer == previous:
                                         stable += 1
                                     else:
@@ -629,12 +788,23 @@ class ChatGPTWebProvider(BrowserUIProvider):
             if not await scope.count():
                 continue
             controls = scope.locator(TURN_COPY_BUTTON)
-            # ChatGPT can render the turn's toolbar before it is visually
-            # displayed (hover/focus responsive controls). The existence of a
-            # *turn-scoped* action is stronger evidence than a global Copy
-            # action, but only alongside stable text and a non-busy turn.
-            if await controls.count() > 0 or await controls.first.is_visible():
+            # The toolbar may be CSS-hidden until hover; existence is enough
+            # ONLY inside the assistant turn itself or its dedicated wrapper.
+            if await controls.count() or await controls.first.is_visible():
                 return True
+        # New UI: a turn-key wrapper can group a user's prompt and its answer.
+        # Its Copy action is valid only when DOM-order AFTER this assistant,
+        # not merely because an earlier/user Copy action is present.
+        group = assistant.locator('xpath=ancestor::*[@data-turn-key][1]')
+        if await group.count():
+            controls = group.locator(TURN_COPY_BUTTON)
+            for index in range(min(32, await controls.count())):
+                action = controls.nth(index)
+                answer_handle = await assistant.element_handle()
+                if await action.evaluate("""(b, a) =>
+                    !!(a && b && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING))
+                """, answer_handle):
+                    return True
         return False
 
     async def _capture_baseline(self, page: Any) -> TurnBaseline:
@@ -668,9 +838,17 @@ class ChatGPTWebProvider(BrowserUIProvider):
                 copy_ready = await self._turn_copy_ready(new_turn)
                 pending = await new_turn.locator(TURN_PENDING).count() > 0
                 rendering = state.state == "generation_in_progress"
-                markdown = new_turn.locator(".markdown")
-                text = ((await markdown.first.inner_text()) if await markdown.count()
-                        else (await new_turn.inner_text())).strip()
+                try:
+                    text = await _recovery_assistant_text(new_turn)
+                except BrowserUIError as extraction_error:
+                    # An accessibility-only heading is not an answer. Keep
+                    # waiting for real content, but never return the heading.
+                    if extraction_error.code not in (
+                        "reconcile_assistant_content_unverified",
+                        "reconcile_assistant_content_ambiguous",
+                    ):
+                        raise
+                    text = ""
                 if text and text == previous:
                     stable += 1
                 else:

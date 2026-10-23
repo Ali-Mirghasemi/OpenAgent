@@ -1,3 +1,25 @@
+## v0.4.20 — Correct role-label-only recovered answers
+- [x] Verify that v0.4.19 Windows recovery captured `ChatGPT said:` (not content).
+- [x] Require assistant content beyond a role/accessibility heading.
+- [x] Add scoped sibling-markdown extraction and Chromium regressions.
+- [x] Implement one-time read-only-check + opt-in correction of last done turn.
+- [x] Atomic transcript/cache update with audit fingerprint; no remote send.
+- [ ] Verify v0.4.20 repair-check and repair against the original Windows session.
+- [ ] Validate a second live Project conversation turn only after text correction.
+- [ ] Project resources, model/effort selection, uploads/downloads,
+      OpenCode/9Router, additional providers and standalone agent.
+
+## v0.4.19 — Recovery of the original unknown Project reply
+- [x] Diagnose v0.4.18 Windows stage `reconcile_user_turn_missing`.
+- [x] Support strict article-level and grouped/bubble user turns for recovery.
+- [x] Add read-only, count-only Project DOM marker inspection behind journal checks.
+- [x] Exercise false-positive user/Copy controls and zero-click Chromium tests.
+- [ ] Run `reconcile-dom-check` and `reconcile-check` on Windows for the existing
+      unknown request. Reconcile only if the latter returns `verifiable: true`.
+- [ ] Verify second Project turn only after a successful recovery and provider permission.
+- [ ] Add Project resources, model/effort options, upload/download, OpenCode/9Router,
+      other providers and coding-agent functionality.
+
 ## v0.4.18 — Project recovery diagnostics
 - [x] Windows v0.4.17 validated: 215 tests, original `unknown` turn remained
       unmodified after a 409 on read-only recovery.

@@ -155,3 +155,36 @@ async def test_reconcile_error_exposes_finite_code_no_dom_text(tmp_path):
         assert 'Secret prompt' not in r.text
     assert store.list_turns(sid)[0]['status'] == 'unknown'
     store.close()
+
+@pytest.mark.asyncio
+async def test_dom_check_endpoint_is_read_only_and_validates_unknown_turn(tmp_path):
+    class DOMRecoveryProvider(RecoveryProvider):
+        async def inspect_project_conversation_dom(self, *, project_id, conversation_url):
+            self.dom_checks = getattr(self, 'dom_checks', 0) + 1
+            return {'route_verified': True, 'markers': {'user_role': 0, 'user_bubble': 1},
+                    'submitted': False, 'journal_changed': False}
+
+    provider = DOMRecoveryProvider()
+    reg = Registry(); reg.register(provider)
+    store = SessionStore(tmp_path/'dom.sqlite')
+    sid = store.create('chatgpt-web/default')['id']
+    store.bind_verified_project(sid, PROJECT_ID, 'OpenAgent')
+    message = {'role': 'user', 'content': 'Private prompt not to disclose'}
+    store.claim_turn(sid, 'x', Message(**message), expected_project_id=PROJECT_ID)
+    store.fail_turn(sid, 'x')
+    endpoint = f'/openagent/sessions/{sid}/turns/x/reconcile-dom-check'
+    async with AsyncClient(transport=ASGITransport(app=create_app(reg, store)),
+                           base_url='http://test') as client:
+        body = {'message': message, 'conversation_url': SLUG_ROUTE}
+        wrong = await client.post(endpoint, json={**body, 'message':
+            {'role': 'user', 'content': 'different'}})
+        assert wrong.status_code == 409
+        assert not hasattr(provider, 'dom_checks')
+        result = await client.post(endpoint, json=body)
+        assert result.status_code == 200
+        assert result.json()['markers']['user_bubble'] == 1
+        assert 'Private prompt' not in result.text and CID not in result.text
+        assert store.list_turns(sid)[0]['status'] == 'unknown'
+        assert store.get(sid)['messages'] == []
+        assert provider.dom_checks == 1
+    store.close()
