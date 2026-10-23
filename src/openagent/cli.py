@@ -382,6 +382,51 @@ async def _chatgpt_projects(args: argparse.Namespace) -> int:
         print(f"ChatGPT project discovery failed ({type(exc).__name__}).")
         return 1
 
+async def _chatgpt_project_check(args: argparse.Namespace) -> int:
+    """Inspect a chosen Project overview; do not submit, select for API, or save IDs."""
+    from .browser import BrowserManager, BrowserError
+    from .providers.chatgpt_web import CHATGPT_URL
+    from .providers.chatgpt_projects import (
+        parse_project_url, wait_for_chatgpt_projects, scan_chatgpt_projects,
+        verify_chatgpt_project_destination,
+    )
+    origin = "https://chatgpt.com"
+    candidate = f"{origin}/g/{args.project_id}/project"
+    if parse_project_url(candidate) != args.project_id:
+        print("Invalid Project ID (expected g-p-... from chatgpt-projects).")
+        return 2
+    try:
+        config = replace(_browser_settings(args), allowed_origins=(origin,))
+        async with BrowserManager(config) as manager:
+            home = await manager.open_tab("chatgpt-project-selector", CHATGPT_URL)
+            try:
+                if args.load_all:
+                    scan = await scan_chatgpt_projects(home, wait_seconds=args.wait_seconds,
+                                                       max_steps=args.max_steps)
+                    inventory = scan.projects
+                else:
+                    inventory = await wait_for_chatgpt_projects(home, wait_seconds=args.wait_seconds)
+            finally:
+                await manager.close_tab("chatgpt-project-selector")
+            matched = next((p for p in inventory if p.id == args.project_id), None)
+            if matched is None:
+                result = {"state": "unverified", "evidence": "project_not_in_visible_inventory",
+                          "project_id": args.project_id, "submitted": False,
+                          "selected_for_api": False}
+            else:
+                page = await manager.open_tab("chatgpt-project-destination", matched.url)
+                try:
+                    result = (await verify_chatgpt_project_destination(
+                        page, matched, wait_seconds=args.wait_seconds)).as_dict()
+                finally:
+                    await manager.close_tab("chatgpt-project-destination")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result["state"] == "verified" else 2
+    except (BrowserError, ValueError, OSError) as exc:
+        print(f"Project destination check failed ({type(exc).__name__}); no message submitted.")
+        return 1
+
+
 def _api_check(args: argparse.Namespace) -> int:
     """Check a loopback OpenAgent server without displaying or storing secrets."""
     from urllib.parse import urlsplit
@@ -514,11 +559,20 @@ def main() -> None:
     projects_cmd.add_argument("--max-steps", type=int, default=15,
                               help="max 1-60 UI expansion/scroll steps with --load-all (default 15)")
 
+    project_check = browser_sub.add_parser(
+        "chatgpt-project-check", help="EXPERIMENTAL read-only verification of a chosen Project page")
+    project_check.add_argument("--project-id", required=True,
+                               help="exact g-p-... ID returned by chatgpt-projects")
+    project_check.add_argument("--load-all", action="store_true",
+                               help="opt in to Project-list Show more/scroll discovery")
+    project_check.add_argument("--wait-seconds", type=float, default=8.0)
+    project_check.add_argument("--max-steps", type=int, default=30)
+
     fixture = browser_sub.add_parser("ui-test", help="submit one turn ONLY to a locally hosted UI fixture")
     fixture.add_argument("--url", default="http://127.0.0.1:8999/chat_fixture.html")
     fixture.add_argument("--message", default="Hello from OpenAgent")
 
-    for p in (diagnose, fixture, chatgpt_status, compose_check, projects_cmd):
+    for p in (diagnose, fixture, chatgpt_status, compose_check, projects_cmd, project_check):
         p.add_argument("--mode", choices=["persistent", "cdp"], default="persistent")
         p.add_argument("--browser", choices=["chromium", "chrome", "msedge", "firefox"])
         p.add_argument("--browser-path", type=Path)
@@ -548,6 +602,8 @@ def main() -> None:
             raise SystemExit(asyncio.run(_chatgpt_compose_check(args)))
         if args.browser_command == "chatgpt-projects":
             raise SystemExit(asyncio.run(_chatgpt_projects(args)))
+        if args.browser_command == "chatgpt-project-check":
+            raise SystemExit(asyncio.run(_chatgpt_project_check(args)))
         if args.browser_command == "open":
             try:
                 code = asyncio.run(_open_browser(args))

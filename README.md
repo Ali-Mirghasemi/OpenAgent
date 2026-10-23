@@ -1,3 +1,17 @@
+### Project destination check (experimental, v0.4.14)
+
+Following the read-only Project inventory, choose an exact discovered Project
+ID and perform a read-only Project Home verification. This only navigates to
+and inspects the selected Project, without sending or saving a session binding:
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-project-check --headful --project-id "g-p-YOUR_ID" --load-all --wait-seconds 12
+```
+
+A `verified` result requires both the Project route and its visible main heading
+matching the selected identity. Redirects, sidebar-only names, and different
+UI layouts are `unverified`. See `docs/chatgpt-project-verification.md`.
+
 # OpenAgent Bridge v0.4.13 — Projects “Show more” button recognition
 
 Windows v0.4.12 passed 170 tests but `chatgpt-projects --load-all`

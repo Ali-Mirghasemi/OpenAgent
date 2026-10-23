@@ -1,3 +1,14 @@
+## v0.4.14 milestone (2026-10-23)
+- Windows v0.4.13: 173 tests passed; live sidebar scan discovered 14 Projects
+  after the actual Show more button was expanded. A later scan saw 14 on load;
+  sidebar state may persist. Scan is best effort, never claims completeness.
+- New experimental browser `chatgpt-project-check`: explicit Project ID,
+  independent discovered-ID check, candidate route navigation, exact visible
+  Project heading inside main, no chat submission and no API selection.
+- Must not conflate a Project sidebar row or ordinary chat route with a
+  verified Project-scoped conversation. Fail closed if UI differs.
+- Next milestone: verified Project/chat session binding and controls.
+
 ## v0.4.13 Projects expansion boundary
 - “Show more” may be a generic sidebar button without a semantic Projects
   wrapper. Infer a Projects list only from locally grouped Projects heading,

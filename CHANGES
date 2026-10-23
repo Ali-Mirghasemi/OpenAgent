@@ -1,3 +1,18 @@
+## 0.4.14 — 2026-10-23
+- User confirmed v0.4.13 on Windows: 173 tests; `--load-all` expanded
+  "Show more" once and discovered 14 Projects (up from five). A second
+  invocation saw 14 already rendered, likely due to persisted sidebar state.
+- Add an opt-in, read-only `browser chatgpt-project-check --project-id`.
+  Discovery first validates the requested ID; the destination checker requires
+  both an unchanged canonical Project route and an exact visible Project
+  heading inside the main page, not merely a sidebar row.
+- Return explicit `unverified` results for redirects, missing titles, login
+  controls, and undiscovered IDs. No saved selection or chat submission.
+- Add real Chromium local fixture tests for matching, mismatched, redirected,
+  logged-out, sidebar-only and delayed Project destinations.
+- Project-scoped chat API binding, model/effort selection, files and OpenCode
+  remain separately gated future milestones.
+
 ## 0.4.13 — 2026-10-23
 - Windows v0.4.12: 170 tests passed; five Projects found, four sidebar
   scrolls, zero expansion clicks despite a user-visible “Show more” control.

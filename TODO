@@ -1,3 +1,15 @@
+## v0.4.14 — Read-only Project destination verification
+- [x] Verify v0.4.13 on Windows: 173 tests, 14 Projects, one Show more click.
+- [x] Add explicit Project ID selector and same-origin destination check.
+- [x] Require exact main heading AND canonical route before reporting verified.
+- [x] Reject Project redirect, login gate, wrong title and sidebar-only evidence.
+- [x] Add opt-in `--load-all` for IDs not immediately in the sidebar.
+- [ ] Validate destination check in Windows on the user-selected Project.
+- [ ] Bind verified Project identity to OpenAgent's local sessions and check
+      real project-scoped conversation IDs before enabling project submissions.
+- [ ] Live response completion, model/effort options, file transfers,
+      OpenCode/9Router integration and additional providers.
+
 ## v0.4.13 — Show more Projects control
 - [x] Verify v0.4.12 on Windows: 170 tests, five projects, four scrolls, no clicks.
 - [x] Scope generic Show more buttons using the nearest Projects heading and

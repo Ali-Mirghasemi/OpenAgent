@@ -330,3 +330,71 @@ async def scan_chatgpt_projects(page, *, origin: str = "https://chatgpt.com",
             break
     return ProjectScanReport(tuple(found.values()), initial_count, scrolls, clicks,
                              more_controls_seen=more_controls_seen)
+
+
+@dataclass(frozen=True)
+class ProjectDestinationReport:
+    """Read-only verification result. No request or saved selection is implied."""
+
+    state: str
+    evidence: str
+    project_id: str
+    project_name: str
+
+    def as_dict(self) -> dict[str, str | bool]:
+        return {
+            "state": self.state,
+            "evidence": self.evidence,
+            "project_id": self.project_id,
+            "project_name": self.project_name,
+            "submitted": False,
+            "selected_for_api": False,
+        }
+
+
+async def verify_chatgpt_project_destination(
+    page, project: ChatGPTProject, *, origin: str = "https://chatgpt.com",
+    wait_seconds: float = 8.0, poll_seconds: float = .3,
+) -> ProjectDestinationReport:
+    """Verify an explicitly requested Project page without touching its controls.
+
+    The candidate /g/<id>/project route alone is insufficient: some real UI
+    versions redirect it. We additionally require a visible, exact Project
+    heading inside MAIN (a sidebar row with the same title is not proof).
+    This deliberately produces 'unverified' for unknown layout variants.
+    """
+    if not 0 <= wait_seconds <= 30:
+        raise ValueError("wait_seconds must be between 0 and 30")
+    if poll_seconds <= 0:
+        raise ValueError("poll_seconds must be positive")
+    if not _PROJECT_ID.fullmatch(project.id) or not project.name or project.name == project.id:
+        raise ValueError("project must have a validated ID and visible, distinct name")
+    if parse_project_url(project.url, expected_origin=origin) != project.id:
+        raise ValueError("project URL does not match requested identity")
+
+    def report(evidence: str) -> ProjectDestinationReport:
+        return ProjectDestinationReport(
+            state="verified" if evidence == "project_heading_matches_route" else "unverified",
+            evidence=evidence, project_id=project.id, project_name=project.name,
+        )
+
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        # Exit promptly if the app moved us away from the candidate Project.
+        if parse_project_url(page.url, expected_origin=origin) != project.id:
+            return report("route_mismatch")
+        if await page.locator(
+            'a[href*="/auth/login"], button:text-is("Log in"), '
+            'button:text-is("Sign in"), iframe[src*="challenges.cloudflare.com"]'
+        ).first.is_visible():
+            return report("login_or_challenge_visible")
+        main = page.locator("main")
+        if await main.count() and await main.first.is_visible():
+            # Restrict title evidence to MAIN; sidebar project labels are not enough.
+            headings = main.first.get_by_role("heading", name=project.name, exact=True)
+            for index in range(min(8, await headings.count())):
+                if await headings.nth(index).is_visible():
+                    return report("project_heading_matches_route")
+        if time.monotonic() >= deadline:
+            return report("project_heading_not_verified")
+        await asyncio.sleep(min(poll_seconds, max(0.0, deadline - time.monotonic())))
