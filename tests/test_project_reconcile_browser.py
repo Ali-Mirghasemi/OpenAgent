@@ -346,3 +346,69 @@ async def test_live_answer_wait_ignores_heading_and_reads_later_sibling_content_
         result = await provider._wait_for_answer(page, baseline, False)
         assert result == ANSWER
         await browser.close_tab('live-reply-fixture')
+
+@pytest.mark.asyncio
+async def test_repair_scoped_plain_text_without_markdown_chromium(tmp_path):
+    """Current UI can render assistant content in an unclassed sibling."""
+    exe = find_chromium_executable()
+    if not exe: pytest.skip('No Chromium executable')
+    pytest.importorskip('playwright')
+    html = f'''<!doctype html><html><body><main>
+    <div data-turn-key="new">
+      <div data-user-message-bubble>{PROMPT}</div>
+      <div data-conversation-role="assistant">ChatGPT said:</div>
+      <div data-chatgpt-agent-turn-start></div>
+      <section><p>{ANSWER}</p></section>
+      <button aria-label="Copy">Copy</button>
+      <div>Do not include follow-up sidebar/action text</div>
+    </div></main><script>window.clicked=0</script></body></html>'''
+    browser = BrowserManager(BrowserConfig(profile_dir=tmp_path/'browser'),
+                             backend=LocalContentBackend(exe, html))
+    async with browser:
+        proxy = ReadOnlyBrowser(browser)
+        provider = ChatGPTWebProvider(proxy, url=ORIGIN+'/', timeout_s=1.4, poll_s=.04,
+            stable_observations=2, enable_conversation_continuation=True,
+            enable_project_messages=True)
+        census = await provider.inspect_project_repair_dom(
+            project_id=PROJECT_ID, conversation_url=URL, user_message=PROMPT)
+        assert census['user_matches'] and census['assistant_after_user']
+        assert census['plain_text_nodes'] >= 1
+        assert census['scoped_answer_usable'] is True
+        assert census['named_content_in_turn_key'] == 0
+        assert ANSWER not in str(census) and PROMPT not in str(census)
+        result = await provider.reconcile_project_turn(
+            project_id=PROJECT_ID, project_name='OpenAgent',
+            conversation_url=URL, user_message=PROMPT)
+        assert result.content == ANSWER
+        assert proxy.click_counts == [0, 0]
+
+
+@pytest.mark.asyncio
+async def test_repair_plain_fallback_requires_scoped_start_and_copy_chromium(tmp_path):
+    exe = find_chromium_executable()
+    if not exe: pytest.skip('No Chromium executable')
+    pytest.importorskip('playwright')
+    html = f'''<!doctype html><html><body><main>
+    <div data-turn-key="new">
+      <div data-user-message-bubble>{PROMPT}</div>
+      <div data-conversation-role="assistant">ChatGPT said:</div>
+      <div data-chatgpt-agent-turn-start></div>
+      <p>{ANSWER}</p>
+    </div><button aria-label="Copy">Copy</button>
+    </main><script>window.clicked=0</script></body></html>'''
+    browser = BrowserManager(BrowserConfig(profile_dir=tmp_path/'browser'),
+                             backend=LocalContentBackend(exe, html))
+    async with browser:
+        proxy = ReadOnlyBrowser(browser)
+        provider = ChatGPTWebProvider(proxy, url=ORIGIN+'/', timeout_s=1.1, poll_s=.03,
+            stable_observations=2, enable_conversation_continuation=True,
+            enable_project_messages=True)
+        report = await provider.inspect_project_repair_dom(
+            project_id=PROJECT_ID, conversation_url=URL, user_message=PROMPT)
+        assert report['scoped_plain_status'] == 'no_scoped_copy'
+        with pytest.raises(BrowserUIError) as exc:
+            await provider.reconcile_project_turn(
+                project_id=PROJECT_ID, project_name='OpenAgent',
+                conversation_url=URL, user_message=PROMPT)
+        assert exc.value.code in ('reconcile_completion_marker_missing', 'reconcile_assistant_content_unverified')
+        assert proxy.click_counts == [0, 0]

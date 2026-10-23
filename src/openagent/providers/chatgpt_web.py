@@ -23,6 +23,7 @@ from ..models import Message, ProviderOutput
 from .browser_ui import BrowserSiteProfile, BrowserUIError, BrowserUIProvider, serialize_messages
 from .turn_identity import TurnBaseline, find_new_turn, snapshot_turns
 from .reply_text import is_trustworthy_answer
+from .chatgpt_page_state import chatgpt_page_error, chatgpt_feature_inventory
 from .chatgpt_projects import (
     ChatGPTProject, parse_project_url, verify_chatgpt_project_destination,
 )
@@ -134,6 +135,61 @@ async def _recovery_user_text(turn: Any) -> str:
     return ' '.join((await turn.inner_text()).split())
 
 
+# A few UI variants render the answer as plain text after a separate
+# [data-chatgpt-agent-turn-start] sentinel, rather than inside .markdown.
+# This walk is STRICTLY limited to the assistant's own keyed/role-bearing turn:
+# it never scans main, the sidebar, earlier users or unrelated action labels.
+_SCOPED_PLAIN_ANSWER_JS = r"""(role) => {
+    const after = (a, b) => !!(a && b &&
+        (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING));
+    const scope = role.closest('[data-turn-key]') ||
+        role.closest('article[data-turn="assistant"]') ||
+        role.closest('[data-testid^="conversation-turn-"]');
+    const data = {scope: !!scope, startCount: 0, copyAfterStart: 0,
+        textNodes: 0, answer: '', reason: 'no_scoped_turn'};
+    if (!scope || !scope.contains(role)) return data;
+    const starts = [...scope.querySelectorAll('[data-chatgpt-agent-turn-start]')]
+        .filter(e => after(role, e));
+    data.startCount = starts.length;
+    if (starts.length !== 1) {data.reason = 'start_not_unique'; return data;}
+    const start = starts[0];
+    const copies = [...scope.querySelectorAll(
+        'button[data-testid="copy-turn-action-button"], button[aria-label="Copy"],'+
+        'button[aria-label="Copy message"], button[aria-label="Copy response"]')]
+        .filter(e => after(start, e));
+    data.copyAfterStart = copies.length;
+    if (!copies.length) {data.reason = 'no_scoped_copy'; return data;}
+    const end = copies[0];
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+    const pieces = [];
+    let node;
+    while ((node = walker.nextNode())) {
+        if (!after(start, node) || !after(node, end)) continue;
+        const element = node.parentElement;
+        if (!element || !element.getClientRects().length || element.closest(
+            'button, a, input, textarea, select, [role="button"],'+
+            '[contenteditable="true"], [aria-hidden="true"],'+
+            '[data-conversation-role], script, style, noscript, .sr-only, [class*="sr-only"]')) continue;
+        const value = (node.textContent || '').trim();
+        if (!value) continue;
+        data.textNodes++;
+        if (pieces.length < 128) pieces.push(value);
+    }
+    data.answer = pieces.join('\n').slice(0, 262145);
+    data.reason = data.answer ? 'plain_candidate' : 'no_plain_candidate';
+    return data;
+}"""
+
+
+async def _scoped_plain_answer(assistant: Any) -> dict[str, Any]:
+    """Read text only between assistant-start and its own Copy action."""
+    # Test doubles and older browser backends may not implement evaluate.
+    # Missing DOM-evaluation support is NOT evidence of answer completion.
+    if not callable(getattr(assistant, 'evaluate', None)):
+        return {'reason': 'scoped_dom_unavailable', 'answer': ''}
+    return await assistant.evaluate(_SCOPED_PLAIN_ANSWER_JS)
+
+
 async def _recovery_assistant_text(assistant: Any) -> str:
     """Extract *answer content*, not the assistant's accessibility role label.
 
@@ -179,11 +235,18 @@ async def _recovery_assistant_text(assistant: Any) -> str:
                              'Multiple competing assistant content blocks')
 
     # Simple role-marked fixtures (and some older UIs) put the visible answer
-    # directly in the role node, without a .markdown wrapper. Only accept it
-    # if it is clearly more than a role heading or accessibility announcement.
+    # directly in the role node, without a .markdown wrapper. Avoid a DOM
+    # fallback when an explicit role node already contains a trustworthy reply.
     raw = (await assistant.inner_text()).strip()
     if is_trustworthy_answer(raw) and not raw.casefold().startswith(("chatgpt said:", "chatgpt says:", "assistant said:", "assistant says:")):
         return raw
+
+    # The live page may not contain .markdown at all. Only then try a bounded
+    # answer walk with a start marker and a later Copy action inside the same
+    # dedicated turn; exclude buttons, hidden nodes and content after Copy.
+    plain = await _scoped_plain_answer(assistant)
+    if plain["reason"] == "plain_candidate" and is_trustworthy_answer(plain["answer"]):
+        return plain["answer"]
     raise BrowserUIError('reconcile_assistant_content_unverified',
                          'Assistant content could not be distinguished from a role label')
 
@@ -287,6 +350,39 @@ class ChatGPTWebProvider(BrowserUIProvider):
             raise ValueError("Project messages require upstream conversation continuation")
         self.supports_upstream_conversations = enable_conversation_continuation
         self.supports_project_messages = enable_project_messages
+
+    @staticmethod
+    async def _check_page_error(page: Any, *, wait_seconds: float = 0.0) -> None:
+        """Recognize inaccessible chat, even during a delayed SPA error redirect.
+
+        The bounded wait is used only when routing already failed; it never
+        navigates again or retries a model request.
+        """
+        deadline = time.monotonic() + wait_seconds
+        while True:
+            code = await chatgpt_page_error(page)
+            if code is not None:
+                raise BrowserUIError(code, "ChatGPT conversation unavailable; no request replay")
+            if time.monotonic() >= deadline:
+                return
+            await asyncio.sleep(min(0.1, deadline - time.monotonic()))
+
+    async def inspect_feature_controls(self) -> dict[str, Any]:
+        """Read-only inventory; never opens model/effort pickers or file dialogs."""
+        async with self._turn_lock:
+            await self.browser.start()
+            tab_id = "feature-scan-" + uuid.uuid4().hex
+            page = None
+            try:
+                page = await self.browser.open_tab(tab_id, self.site.url)
+                observed = await inspect_ui(page, self.site.selectors)
+                return {"page_state": observed.state,
+                        "controls": await chatgpt_feature_inventory(page),
+                        "selection_changed": False, "uploaded": False,
+                        "submitted": False}
+            finally:
+                if page is not None:
+                    await self.browser.close_tab(tab_id)
 
     async def inspect(self) -> UIObservation:
         # Readiness is VISUAL only; it is not proof of authentication.
@@ -439,8 +535,10 @@ class ChatGPTWebProvider(BrowserUIProvider):
             submitted = False
             try:
                 page = await self.browser.open_tab(tab_id, target)
+                await self._check_page_error(page)
                 if continuing:
                     if parse_project_conversation_id(page.url, project_id, expected_origin=origin) != upstream_conversation_id:
+                        await self._check_page_error(page, wait_seconds=0.65)
                         raise BrowserUIError("project_mismatch", "Project conversation redirect was not trusted")
                     baseline = await self._capture_baseline(page)
                     if baseline.count < 1:
@@ -491,6 +589,79 @@ class ChatGPTWebProvider(BrowserUIProvider):
                 if page is not None:
                     await self.browser.close_tab(tab_id)
 
+    async def inspect_project_repair_dom(
+        self, *, project_id: str, conversation_url: str, user_message: str,
+    ) -> dict[str, Any]:
+        """Read-only answer-shape inspection for an exact, saved Project turn.
+
+        The API separately validates the immutable request and Project binding.
+        Never return page text, URL, IDs, attributes, or screenshots.
+        """
+        if not (self.supports_project_messages and self.supports_upstream_conversations):
+            raise BrowserUIError('project_messages_disabled', 'Project inspection is disabled')
+        origin = _origin(self.site.url)
+        chat_id = parse_project_conversation_id(
+            conversation_url, project_id, expected_origin=origin)
+        if chat_id is None or not isinstance(user_message, str) or not user_message:
+            raise BrowserUIError('reconcile_invalid_input', 'Invalid Project inspection input')
+        async with self._turn_lock:
+            await self.browser.start()
+            tab_id = 'repair-dom-' + uuid.uuid4().hex
+            page = None
+            try:
+                page = await self.browser.open_tab(tab_id, conversation_url)
+                await self._check_page_error(page)
+                deadline = time.monotonic() + min(8.0, self.site.timeout_s)
+                last = None
+                while time.monotonic() < deadline:
+                    await self._check_page_error(page)
+                    if parse_project_conversation_id(
+                        page.url, project_id, expected_origin=origin) != chat_id:
+                        await self._check_page_error(page, wait_seconds=0.65)
+                        raise BrowserUIError('reconcile_route_mismatch', 'Project route changed')
+                    user = await _recovery_last_marked_turn(page, RECOVERY_USER_SELECTORS)
+                    assistant = await _recovery_last_marked_turn(page, RECOVERY_ASSISTANT_SELECTORS)
+                    if user is not None and assistant is not None:
+                        user_matches = (await _recovery_user_text(user) ==
+                                        ' '.join(user_message.split()))
+                        uh, ah = await user.element_handle(), await assistant.element_handle()
+                        ordered = await page.evaluate("""(els) => !!(els[0] && els[1] &&
+                            (els[0].compareDocumentPosition(els[1]) & Node.DOCUMENT_POSITION_FOLLOWING))""", [uh, ah])
+                        plain = await _scoped_plain_answer(assistant) if ordered and user_matches else {}
+                        named = assistant.locator(
+                            '.markdown, [data-message-content], [data-testid="assistant-message-content"]')
+                        group = assistant.locator('xpath=ancestor::*[@data-turn-key][1]')
+                        group_named = (group.first.locator(
+                            '.markdown, [data-message-content], [data-testid="assistant-message-content"]')
+                            if await group.count() else None)
+                        return {
+                            'route_verified': True, 'user_matches': user_matches,
+                            'assistant_after_user': bool(ordered),
+                            'assistant_turn_key': bool(await group.count()),
+                            'named_content_inside_role': min(99, await named.count()),
+                            'named_content_in_turn_key': (
+                                min(99, await group_named.count()) if group_named is not None else 0),
+                            'assistant_start_after_role': min(99, plain.get('startCount', 0)),
+                            'copy_after_start': min(99, plain.get('copyAfterStart', 0)),
+                            'plain_text_nodes': min(99, plain.get('textNodes', 0)),
+                            'scoped_plain_status': plain.get('reason', 'not_checked'),
+                            'scoped_answer_usable': bool(
+                                plain.get('answer') and is_trustworthy_answer(plain['answer'])),
+                            'submitted': False, 'journal_changed': False,
+                        }
+                    last = 'turns_not_loaded'
+                    await asyncio.sleep(self.site.poll_s)
+                raise BrowserUIError('reconcile_turns_missing', last or 'Turns not found')
+            except BrowserUIError:
+                raise
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                raise BrowserUIError('reconcile_dom_unavailable', 'Answer shape could not be inspected') from exc
+            finally:
+                if page is not None:
+                    await self.browser.close_tab(tab_id)
+
     async def inspect_project_conversation_dom(
         self, *, project_id: str, conversation_url: str,
     ) -> dict[str, Any]:
@@ -512,12 +683,15 @@ class ChatGPTWebProvider(BrowserUIProvider):
             page = None
             try:
                 page = await self.browser.open_tab(tab_id, conversation_url)
+                await self._check_page_error(page)
                 deadline = time.monotonic() + min(8.0, self.site.timeout_s)
                 counts: dict[str, int] = {}
                 previous = None
                 stable = 0
                 while True:
+                    await self._check_page_error(page)
                     if parse_project_conversation_id(page.url, project_id, expected_origin=origin) != expected_chat:
+                        await self._check_page_error(page, wait_seconds=0.65)
                         raise BrowserUIError("reconcile_route_mismatch", "Project conversation navigation changed")
                     state = await inspect_ui(page, self.site.selectors)
                     if state.state in ("login_required", "security_challenge", "rate_limited", "browser_disconnected"):
@@ -571,11 +745,14 @@ class ChatGPTWebProvider(BrowserUIProvider):
             stage = "page_not_loaded"
             try:
                 page = await self.browser.open_tab(tab_id, conversation_url)
+                await self._check_page_error(page)
                 previous, stable = None, 0
                 deadline = time.monotonic() + min(12.0, self.site.timeout_s)
                 while time.monotonic() < deadline:
+                    await self._check_page_error(page)
                     if (parse_project_conversation_id(page.url, project_id, expected_origin=origin)
                             != expected_chat):
+                        await self._check_page_error(page, wait_seconds=0.65)
                         raise BrowserUIError("reconcile_route_mismatch", "Project conversation navigation changed")
                     state = await inspect_ui(page, self.site.selectors)
                     if state.state in ("login_required", "security_challenge", "rate_limited", "browser_disconnected"):
@@ -819,6 +996,7 @@ class ChatGPTWebProvider(BrowserUIProvider):
         stable = 0
         active_key: str | None = None
         while time.monotonic() < deadline:
+            await self._check_page_error(page)
             state = await inspect_ui(page, self.site.selectors)
             if state.state in (
                 "login_required", "security_challenge", "rate_limited",

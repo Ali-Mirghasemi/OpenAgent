@@ -1,3 +1,37 @@
+## v0.4.22 — Unavailable-chat detection and read-only feature inventory
+- [x] Windows v0.4.21: 235 passing tests; repair attempts sometimes returned
+      `reconcile_route_mismatch` with ChatGPT displaying a chat access error.
+- [x] Distinguish provider-rendered "cannot access chat" / "chat not available"
+      pages from ordinary route mismatches; account for delayed SPA errors.
+- [x] Never auto-retry, create a replacement chat, or modify completed/unknown
+      request journal when a Project conversation cannot be opened.
+- [x] Add read-only `browser chatgpt-controls` inventory for model picker,
+      thinking-effort picker, file input/attachment button, voice/tools controls.
+- [ ] Windows validation of the new error classifications on real unavailable chats.
+- [ ] Correct existing reply `ChatGPT said:` only when a proper completed answer
+      can be verified (do NOT resend project-test-001).
+- [ ] Persist *verified exact Project conversation route*, including optional
+      slug: current continuation builder reconstructs a slugless route from UUID,
+      which must not be assumed to load the same chat on every account.
+- [ ] Explicit model selection / reasoning effort: inspect menu options, verify
+      selected values, fail closed on unavailable options or UI changes.
+- [ ] File upload/attachment support: opt-in, file size/type/path checks,
+      upload-ready evidence and attachment lifecycle; Project resources.
+- [ ] Streaming, exports/downloads, images/audio and tool features; real provider
+      capability manifest; OpenCode/9Router and additional providers.
+
+## v0.4.21 — Plain-content recovery and diagnostics
+- [x] Diagnose v0.4.20 Windows `reconcile_assistant_content_unverified`.
+- [x] Add bounded plain-text assistant extraction between turn-scoped markers.
+- [x] Reject unrelated Copy actions and text after response actions.
+- [x] Expose read-only, text-free `/repair-dom-check` for a done label-only turn.
+- [x] Test new extraction with isolated Chromium and API fixtures.
+- [ ] Run `/repair-dom-check` and `/repair-check` on Windows; only repair if
+      exact assistant content is verified, never retry first Project message.
+- [ ] Test second Project turn only after correct response is persisted.
+- [ ] Project resources, model/effort, uploads/downloads, OpenCode/9Router,
+      tool execution, other providers and standalone coding agent.
+
 ## v0.4.20 — Correct role-label-only recovered answers
 - [x] Verify that v0.4.19 Windows recovery captured `ChatGPT said:` (not content).
 - [x] Require assistant content beyond a role/accessibility heading.

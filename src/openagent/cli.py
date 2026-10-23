@@ -324,6 +324,21 @@ async def _chatgpt_status(args: argparse.Namespace) -> int:
 
 
 
+async def _chatgpt_controls(args: argparse.Namespace) -> int:
+    """Read-only detection of optional website features, not feature support."""
+    from .browser import BrowserManager, BrowserError
+    from .providers.chatgpt_web import ChatGPTWebProvider
+    try:
+        config = replace(_browser_settings(args), allowed_origins=("https://chatgpt.com",))
+        async with BrowserManager(config) as manager:
+            result = await ChatGPTWebProvider(manager, timeout_s=10).inspect_feature_controls()
+        print(json.dumps(result, indent=2))
+        return 0
+    except (BrowserError, ValueError, OSError) as exc:
+        print(f"ChatGPT feature inventory unavailable ({type(exc).__name__}).")
+        return 1
+
+
 async def _chatgpt_compose_check(args: argparse.Namespace) -> int:
     """Dedicated tab preflight: harmless draft only; no Send clicks."""
     from .browser import BrowserManager, BrowserError
@@ -550,6 +565,7 @@ def main() -> None:
     chatgpt_status.add_argument("--wait-seconds", type=float, default=8.0, help="wait up to 0-30 seconds for the app UI to render (default 8)")
     chatgpt_status.add_argument("--screenshot", type=Path, help="OPTIONAL local PNG: may contain private chat/account details; never shared automatically")
 
+    controls_check = browser_sub.add_parser("chatgpt-controls", help="read-only inventory of model, effort, upload, and other UI controls")
     compose_check = browser_sub.add_parser("chatgpt-compose-check", help="type a harmless draft and inspect Send WITHOUT submitting")
     projects_cmd = browser_sub.add_parser("chatgpt-projects", help="list visible ChatGPT project links/rows without clicking or submitting")
     projects_cmd.add_argument("--json", action="store_true", help="output visible project names and derived candidate URLs as JSON")
@@ -573,7 +589,7 @@ def main() -> None:
     fixture.add_argument("--url", default="http://127.0.0.1:8999/chat_fixture.html")
     fixture.add_argument("--message", default="Hello from OpenAgent")
 
-    for p in (diagnose, fixture, chatgpt_status, compose_check, projects_cmd, project_check):
+    for p in (diagnose, fixture, chatgpt_status, controls_check, compose_check, projects_cmd, project_check):
         p.add_argument("--mode", choices=["persistent", "cdp"], default="persistent")
         p.add_argument("--browser", choices=["chromium", "chrome", "msedge", "firefox"])
         p.add_argument("--browser-path", type=Path)
@@ -599,6 +615,8 @@ def main() -> None:
             raise SystemExit(asyncio.run(_fixture_chat(args)))
         if args.browser_command == "chatgpt-status":
             raise SystemExit(asyncio.run(_chatgpt_status(args)))
+        if args.browser_command == "chatgpt-controls":
+            raise SystemExit(asyncio.run(_chatgpt_controls(args)))
         if args.browser_command == "chatgpt-compose-check":
             raise SystemExit(asyncio.run(_chatgpt_compose_check(args)))
         if args.browser_command == "chatgpt-projects":

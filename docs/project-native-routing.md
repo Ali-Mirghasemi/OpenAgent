@@ -1,3 +1,27 @@
+## v0.4.21: plain answer DOM recovery for an already-completed turn
+
+The Windows v0.4.20 check returned `reconcile_assistant_content_unverified`
+while the screenshot showed the visible answer. The new fallback can read
+unclassed answer text inside the *same* logical assistant turn, bounded by a
+`data-chatgpt-agent-turn-start` marker and subsequent turn Copy action. Hidden,
+accessibility-only, action-control and sidebar text are excluded. There is no
+page-wide `main.innerText` fallback and no chat message is resent.
+
+For a **done**, last, label-only Project turn, call
+`POST /openagent/sessions/{session_id}/turns/{request_id}/repair-dom-check`
+with the exact JSON used for `/repair-check`. This authenticated read-only
+endpoint verifies the local immutable request and Project binding, confirms the
+same Project conversation route, and returns only marker counts and flags.
+Use `scoped_plain_status`, `assistant_start_after_role`,
+`copy_after_start`, `plain_text_nodes`, `assistant_turn_key` and
+`scoped_answer_usable` to identify the missing structural evidence.
+Never share raw DOM, cookies or account data.
+
+If the subsequent `/repair-check` says `correctable: true`, you can run the
+one-time `/repair` endpoint. It repeats the full read-only verification before
+an atomic SQLite update. If either step fails, leave the stored label unchanged
+and do not resubmit the original prompt.
+
 ## v0.4.19: read-only DOM selector diagnosis
 
 The original Windows v0.4.16 Project prompt was submitted and answered, but its

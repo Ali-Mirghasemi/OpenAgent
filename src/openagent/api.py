@@ -382,6 +382,45 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
         except Exception:
             return error_response("Project repair check unavailable", 503, "provider_error")
 
+    @app.post("/openagent/sessions/{session_id}/turns/{request_id}/repair-dom-check")
+    async def check_project_reply_shape(session_id: str, request_id: str, body: ProjectTurnReconcile):
+        """Read-only, text-free answer shape inspection of a completed bad reply.
+
+        Only the exact last label-only Project turn from the immutable journal
+        may be inspected. No history or remote content is returned and this
+        never sends a prompt or writes SQLite.
+        """
+        from .providers.browser_ui import BrowserUIError
+        try:
+            session = store.get(session_id)
+            project = session["project"]
+            if project is None:
+                return error_response("Only Project-bound turns can be inspected", 422)
+            provider = await registry.resolve(session["model"])
+            inspector = getattr(provider, "inspect_project_repair_dom", None)
+            if not (getattr(provider, "supports_upstream_conversations", False) and
+                    getattr(provider, "supports_project_messages", False) and callable(inspector)):
+                return error_response("Project answer inspection is not enabled", 422)
+            if body.message.role != "user" or not isinstance(body.message.content, str):
+                return error_response("Inspection requires the original plain user text", 422)
+            store.require_repairable_project_turn(
+                session_id, request_id, body.message, expected_project_id=project["id"])
+            return await inspector(project_id=project["id"],
+                                   conversation_url=body.conversation_url,
+                                   user_message=body.message.content)
+        except SessionNotFound:
+            raise HTTPException(404, "unknown session")
+        except SessionBusy:
+            return error_response("Only the last identical label-only completed turn can be inspected",
+                                  409, "session_conflict")
+        except BrowserUIError as exc:
+            return JSONResponse({"error": {"message": "Project answer inspection unavailable",
+                                           "type": "provider_error", "code": exc.code}}, status_code=409)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return error_response("Project answer inspection failed", 503, "provider_error")
+
     @app.post("/openagent/sessions/{session_id}/turns/{request_id}/repair")
     async def repair_project_reply(session_id: str, request_id: str, body: ProjectTurnReconcile):
         """Opt-in one-time *correction* of a stored label-only assistant reply.

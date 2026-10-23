@@ -1,3 +1,29 @@
+## v0.4.22 engineering status
+- v0.4.21 Windows: 235 passed; Project repair still blocked, with intermittent
+  live ChatGPT unavailable-chat screens and generic route-mismatch diagnostics.
+- New finite chat error classifications precede route mismatch, including a
+  bounded delayed-error check; never interpret this as authentication bypass.
+- `browser chatgpt-controls` is read-only UI evidence; model and effort setting,
+  uploads, Project resources, and tool calls are NOT yet implemented.
+- Do not retry `project-test-001`: it is a done turn containing only an incorrect
+  label `ChatGPT said:`; repair needs independent complete-answer proof.
+- Project chat continuation reconstructs a slugless route from the stored UUID;
+  exact slugged path persistence/validation is a high-priority remaining task.
+
+## v0.4.21 Bounded assistant plain-text recovery (2026-10-23)
+- Windows verified v0.4.20 (232 tests) and correctly refused to replace the
+  saved label `ChatGPT said:` because remote content remained unverified.
+- A response renderer may have no `.markdown` at all. Consider text nodes ONLY
+  after the assistant-start landmark and before a turn-scoped Copy action in a
+  dedicated assistant turn. Never read page-wide, sidebar or earlier user text.
+- An authenticated `repair-dom-check` exposes a bounded structural report only
+  for an exact stored last completed label-only Project turn. It does not send,
+  change SQLite or expose raw answer text or identifiers.
+- A fresh successful `repair-check` is required before one-time `/repair`;
+  no retries of the original message. Live answer layout still needs verification.
+- Project resources, model/effort selection, file transfer, OpenCode/9Router
+  and additional providers remain planned.
+
 ## v0.4.20 Reply text and correction boundary (2026-10-23)
 - Windows v0.4.19 successfully reconciled original `project-test-001`, but
   stored the accessibility heading `ChatGPT said:` instead of the actual answer.

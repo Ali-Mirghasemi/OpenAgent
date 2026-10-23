@@ -115,3 +115,28 @@ def test_repair_rejects_nonfinal_request_and_different_content(tmp_path):
     with pytest.raises(SessionBusy):
         store.require_repairable_project_turn(sid, 'project-test-001', user,expected_project_id=PROJECT_ID)
     store.close()
+
+@pytest.mark.asyncio
+async def test_repair_dom_shape_gate_rejects_wrong_or_changed_journal(tmp_path):
+    store, sid, user = seeded(tmp_path)
+    provider = RepairProvider()
+    inspected = []
+    async def shape(**kw):
+        inspected.append(kw)
+        return {'route_verified': True, 'plain_text_nodes': 1,
+                'scoped_plain_status': 'plain_candidate', 'submitted': False,
+                'journal_changed': False}
+    provider.inspect_project_repair_dom = shape
+    registry = Registry(); registry.register(provider)
+    root = f'/openagent/sessions/{sid}/turns/project-test-001/repair-dom-check'
+    body = {'message': user.model_dump(mode='json'), 'conversation_url': SLUG_ROUTE}
+    async with AsyncClient(transport=ASGITransport(app=create_app(registry, store)),
+                           base_url='http://test') as client:
+        wrong = await client.post(root, json={**body, 'message': {'role':'user','content':'something else'}})
+        assert wrong.status_code == 409 and not inspected
+        ok = await client.post(root, json=body)
+        assert ok.status_code == 200 and ok.json()['plain_text_nodes'] == 1
+        assert len(inspected) == 1
+        assert store.get(sid)['messages'][-1]['content'] == 'ChatGPT said:'
+        assert store.db.execute('SELECT COUNT(*) FROM turn_corrections').fetchone()[0] == 0
+    store.close()

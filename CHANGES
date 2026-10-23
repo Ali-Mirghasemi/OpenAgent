@@ -1,3 +1,35 @@
+## 0.4.22 — 2026-10-23
+- Recognize explicit ChatGPT access-denied and unavailable-chat pages using
+  only top-level main-page error headings/alerts, never conversation text.
+  Delay route-mismatch classification briefly to catch hydrated error pages.
+- Report `conversation_access_denied` or `conversation_unavailable` in
+  read-only reconciliation/repair-check errors; do not navigate to a new chat,
+  re-submit a prompt, or change the session journal.
+- Add `browser chatgpt-controls --headful`: read-only bounded inventory of
+  model/thinking, attachments/file inputs, voice and tools UI candidates.
+  Presence is NOT capability support; no picker clicks or uploads.
+- Document the known slugless Project-chat continuation reconstruction risk,
+  and prioritize exact URL binding plus verified controls before more live turns.
+- Regression tests for inaccessible chat error screens, delayed rendering,
+  false positives from user messages and feature-control census.
+
+## 0.4.21 — 2026-10-23
+- Windows v0.4.20: 232 tests passed; `repair-check` failed safely with
+  `reconcile_assistant_content_unverified`. The journal still holds the
+  accessibility heading `ChatGPT said:`. No remote message was resent.
+- Add bounded plain-text assistant extraction for renderers without `.markdown`:
+  require an assistant-turn-start marker and a subsequent turn-scoped Copy
+  control inside the same `data-turn-key` / dedicated assistant container.
+  Exclude action buttons, hidden/accessibility-only text and content after Copy.
+  Do not scan the whole page or accept arbitrary page text.
+- Add authenticated, read-only `/repair-dom-check` for the exact last completed
+  label-only Project turn; report only structural counts/status, never chat
+  contents, cookies, URLs, conversation IDs or browser session data.
+- Keep the opt-in `/repair` one-time atomic journal correction unchanged;
+  no auto resubmission, no bypass of browser security checks.
+- Test synthetic Chromium unclassed answer, unrelated Copy control and
+  privacy-preserving diagnostic; live ChatGPT repair still unverified.
+
 ## 0.4.20 — 2026-10-23
 - Windows v0.4.19: 225 tests passed. The previously unknown first Project turn
   was read-only reconciled and its chat ID persisted, but the stored answer was

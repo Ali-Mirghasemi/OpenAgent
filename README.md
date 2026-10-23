@@ -1,3 +1,69 @@
+### v0.4.22 — Chat availability and upcoming page controls (experimental)
+
+When the ChatGPT website displays a top-level "You cannot access this chat",
+"You can not access this chat" or "This chat is not available" message,
+OpenAgent now reports a **specific** `conversation_access_denied` or
+`conversation_unavailable` reason rather than always `reconcile_route_mismatch`.
+Detection never retries, resubmits or fabricates a replacement conversation.
+A changing web UI may still escape detection; unmatched redirects remain
+`reconcile_route_mismatch` and are not considered safe to follow automatically.
+
+Start the normal Project-enabled server, then run the existing read-only
+`/repair-check` and `/repair-dom-check` commands. If the page is inaccessible,
+leave the original journal unchanged; do not resend completed requests.
+
+The new read-only command inventories possible web controls:
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-controls --headful
+```
+
+`model_picker`, `effort_picker`, `attachment_button`, `file_input`,
+`voice_button` and `tools_menu` report only `detected`, `not_detected` or
+`unavailable`. This is **not** an operation or a plan/capability guarantee.
+The control scan opens no menus, reads no filenames or private messages,
+selects no model/effort, and uploads nothing. Fully implemented model/effort
+selection, file transfer and Project resources remain planned work.
+
+**Known continuation limitation:** currently OpenAgent stores the conversation
+UUID but not the exact slugged Project conversation route; it reconstructs a
+slugless URL for follow-up. Some web layouts may reject that route. Do not
+assume a Project continuation is safe until this identity/route handling is
+implemented and tested; never automatically reroute to a different chat.
+
+### v0.4.21: safely locate unclassed Project replies (experimental)
+
+Windows v0.4.20 passed 232 tests, but the saved Project answer is still the
+heading `ChatGPT said:`. The read-only `repair-check` correctly refused a
+correction because it could not identify the actual answer. No duplicate
+message was sent.
+
+The provider now has an additional **bounded** fallback for public UI layouts
+without `.markdown`: it examines visible text nodes only *after* the
+`data-chatgpt-agent-turn-start` marker and *before* a later Copy action,
+inside the same dedicated assistant turn. It excludes actions, hidden nodes,
+role headings, and text outside that turn. On ambiguity it still fails closed.
+
+For the **last already completed label-only Project turn**, the new authenticated
+read-only `POST /openagent/sessions/{id}/turns/{request_id}/repair-dom-check`
+uses the same JSON body as `/repair-check`:
+
+```powershell
+$shape = Invoke-RestMethod -Uri "$base/openagent/sessions/$sid/turns/$requestId/repair-dom-check" -Method Post -Headers $headers -ContentType 'application/json' -Body $recoveryBody -TimeoutSec 45
+$shape | ConvertTo-Json -Depth 10
+```
+
+The report has only structural flags/counts (e.g., `scoped_plain_status`,
+`assistant_start_after_role`, `copy_after_start`, `plain_text_nodes`,
+`scoped_answer_usable`). It does not return message content, URL, cookie,
+Project ID or chat ID and it never clicks Send or changes local history.
+
+Then rerun `/repair-check` with the same body. Only if `correctable` is true
+should you explicitly call `/repair` to commit a newly verified exact answer.
+The repair performs its own fresh verification; a failed check changes nothing.
+**Never resend `project-test-001` or call `/reconcile` again** for that done
+turn. Live compatibility and provider permission are not established by tests.
+
 ### v0.4.20: repair a previously recorded accessibility-label reply (experimental)
 
 Windows v0.4.19 verified the original Project turn and saved its conversation
