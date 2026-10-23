@@ -1,3 +1,49 @@
+# OpenAgent Bridge v0.4.11 — Project sidebar row discovery
+
+Windows v0.4.10 was validated with **161 passing tests** and
+`browser chatgpt-compose-check` returned `send_ready` without submission.
+However, `chatgpt-projects` found 0 project links. Newer ChatGPT layouts may
+render Projects as expandable sidebar rows rather than anchors; this release
+recognizes visible rows with a validated `data-sidebar-project-container-id`
+and adds a bounded wait for the sidebar to render. It **does not click a
+Project, prove a Project route works, or submit a prompt**.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,browser]"
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-projects --headful --wait-seconds 12
+```
+
+Project names/IDs are private metadata; redact them if sharing output.
+A derived `/g/<id>/project` URL is a **candidate only**, not an established
+Project-selection or continuation route. See
+[Project sidebar inspection](docs/chatgpt-project-rows.md).
+
+---
+
+# OpenAgent Bridge v0.4.10 — Send preflight & Projects inventory
+
+Windows v0.4.9 passed 149 tests and reported a typed ChatGPT draft but HTTP 503
+`submit_unavailable` before any Send click. v0.4.10 expands composer-scoped Send
+recognition, adds an explicit **draft-only** diagnostic (`browser chatgpt-compose-check`)
+and a **read-only** Projects link inventory (`browser chatgpt-projects`). It does
+not automatically choose a Project or submit live messages during tests.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,browser]"
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-compose-check --headful
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-projects --headful
+```
+
+Both commands use a dedicated tab that is closed afterward; do not run a second
+OpenAgent process with the same persistent profile. Project names/links are
+private account metadata—inspect before sharing. No actual account-backed
+message submission was performed by the release tests. See
+[composer and Projects inspection](docs/chatgpt-composer-and-projects.md).
+
+---
+
 # OpenAgent Bridge v0.4.9 — Experimental conversation routing
 
 Windows v0.4.8 was validated with 126 passing tests and a successful local

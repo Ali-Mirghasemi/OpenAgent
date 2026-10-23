@@ -1,3 +1,31 @@
+## v0.4.11 — 2026 Project row discovery
+- [x] Confirm v0.4.10 on Windows (161 tests, draft-only Send detected).
+- [x] Discover visible linkless Project rows with validated DOM project markers.
+- [x] Deduplicate link/row IDs; skip hidden, unrelated and invalid rows.
+- [x] Wait for sidebar hydration without clicking or exposing conversation names.
+- [x] Test with injected Chromium fixtures, including delayed rendering.
+- [ ] Verify updated read-only discovery on the user's ChatGPT layout.
+- [ ] Implement explicit Project selection with verified same-Project navigation
+      and project-scoped chat IDs; do not assume candidate URLs are usable.
+- [ ] Add model/thinking controls, safe uploads/downloads, and OpenCode/9Router.
+
+## v0.4.10 — Composer submission investigation & Projects inventory
+- [x] Diagnose authenticated v0.4.9 503: message draft appeared, Send was not clicked.
+- [x] Recognize form-scoped `#composer-submit-button` and test icon-only Send.
+- [x] Add draft-only `chatgpt-compose-check` command (no submission).
+- [x] Fail closed on unrelated page-wide forms, ambiguous forms and hidden/disabled submit controls.
+- [x] Add read-only `chatgpt-projects` discovery with canonical URL validation.
+- [x] Test new selectors and failure safety in locally injected real Chromium DOM.
+- [ ] Verify draft-only Send readiness with the user's Windows signed-in profile.
+- [ ] Verify live response extraction and completion only where provider permits.
+- [ ] Implement user-selected ChatGPT Project binding on local sessions, including
+      project-scoped new chat and `/g/<project>/c/<chat>` continuation verification.
+- [ ] Add explicit model and reasoning-effort discovery/selection only when verifiable.
+- [ ] Build upload/download support with bounded files, content safeguards and tests.
+- [ ] Implement typed tool-call translation, streaming, interruption and OpenCode/9Router tests.
+- [ ] Add DeepSeek/Claude adapters under provider-supported authentication models.
+- [ ] Build standalone coding agent later; tool execution requires user approval.
+
 ## v0.4.9 — Experimental upstream chat routing
 - [x] Preserve existing one-shot ChatGPT adapter unless extra opt-in flag set.
 - [x] Strictly match same-origin `/c/<uuid>` routes; reject redirects and unsafe URLs.

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>ChatGPT composer-submit variant (local)</title></head>
+<body>
+  <main id="history"></main>
+  <!-- A non-composer submit button must NEVER be chosen. -->
+  <form id="search"><input><button type="submit" id="decoy">Search</button></form>
+  <form id="composer-form">
+    <div id="prompt-textarea" role="textbox" contenteditable="true"></div>
+    <!-- Even an active form can have other submit actions. -->
+    <button type="submit" aria-label="Voice input" id="voice">Voice</button>
+    <button id="composer-submit-button" type="submit" disabled aria-disabled="true" hidden>
+      <svg width="10" height="10"><path d="M0 0 L10 10" /></svg>
+    </button>
+  </form>
+  <button data-testid="stop-button" hidden>Stop</button>
+  <script>
+    window.sent = 0;
+    window.decoy = 0;
+    window.voice = 0;
+    document.querySelector('#search').addEventListener('submit', e => { e.preventDefault(); window.decoy++; });
+    document.querySelector('#voice').addEventListener('click', e => { e.preventDefault(); window.voice++; });
+    const composer = document.querySelector('#prompt-textarea');
+    const submit = document.querySelector('#composer-submit-button');
+    composer.addEventListener('input', () => {
+      const text = composer.textContent.trim();
+      submit.hidden = !text;
+      submit.disabled = !text;
+      submit.setAttribute('aria-disabled', text ? 'false' : 'true');
+    });
+    document.querySelector('#composer-form').addEventListener('submit', e => {
+      e.preventDefault();
+      if (e.submitter !== submit || submit.disabled) return;
+      window.sent++;
+      const article = document.createElement('article');
+      article.dataset.turnId = 'fixture-new-id';
+      article.innerHTML = '<div data-message-author-role="assistant"><div class="markdown">Draft response</div><span aria-busy="true"></span></div><button data-testid="copy-turn-action-button">Copy</button>';
+      document.querySelector('#history').append(article);
+      const stop = document.querySelector('[data-testid="stop-button"]');
+      stop.hidden = false;
+      setTimeout(() => {
+        article.querySelector('.markdown').textContent = 'Response from composer-submit variant';
+        article.querySelector('[aria-busy]').remove();
+        stop.hidden = true;
+      }, 160);
+    });
+  </script>
+</body></html>

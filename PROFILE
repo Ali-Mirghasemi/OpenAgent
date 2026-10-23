@@ -1,3 +1,23 @@
+## v0.4.11 read-only Project discovery
+- A Project can appear as a sidebar row with a stable public DOM ID but no
+  anchor. Read the marker only from visible expandable Project rows.
+- Never infer Project membership from the model ID or a generic chat route.
+- Derived Project overview URLs are **candidates**, not authority to select
+  a Project or bind an upstream chat to it; require subsequent verification.
+- No menu clicks, prompt submissions, or nested chat title scraping in inventory.
+
+## v0.4.10 — ChatGPT Send & Project discovery boundary
+- User's authenticated Windows session is UI-ready, but v0.4.9 live smoke
+  request typed a draft and returned `submit_unavailable` before any Send click.
+- Candidate Send resolution is active-composer/form-scoped and rejects obvious
+  non-send actions; no Enter-key or page-wide submit guesswork.
+- Draft-only preflight is an explicit user action and may transiently autosave a
+  harmless draft, but never submits it; project link inventory never clicks.
+- Project discovery is not Project selection, and account/project context must
+  be verified and bound to the right OpenAgent session before use.
+- Keep Project selection, model/reasoning controls, attachments, streaming,
+  provider-adapter breadth and OpenCode/9Router on the product roadmap.
+
 ## v0.4.9 provider-specific continuation preview
 - Only an explicit extra server flag enables synthetic-tested ChatGPT URL
   binding and continuation. Existing one-shot mode is unchanged by default.

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Local project sidebar fixture</title></head>
+<body>
+  <aside aria-label="App navigation">
+    <h2>Projects</h2>
+    <div role="button" aria-expanded="false" tabindex="0" id="row-main">
+      <span data-sidebar-project-container-id="project:g-p-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-dev">
+        <span data-marquee-content="true">Software Lab</span>
+      </span>
+      <button aria-label="Project options">...</button>
+    </div>
+    <div role="button" aria-expanded="true" tabindex="0" id="row-secondary">
+      <div data-sidebar-project-container-id="project:g-p-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-demo">
+        <span data-marquee-text="true">Research Project</span>
+      </div>
+      <div class="nested-chats" hidden>Private conversation names MUST NOT be read</div>
+    </div>
+    <div role="button" aria-expanded="true" hidden>
+      <span data-sidebar-project-container-id="project:g-p-cccccccccccccccccccccccccccccccc-hidden">
+        <span data-marquee-text="true">Hidden</span>
+      </span>
+    </div>
+    <div role="button" aria-expanded="false">
+      <span data-sidebar-project-container-id="project:g-p-not-valid"><span data-marquee-text="true">Invalid</span></span>
+    </div>
+    <a href="/g/g-p-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-dev/project" hidden>Duplicate link</a>
+    <div id="outside-marker" data-sidebar-project-container-id="project:g-p-dddddddddddddddddddddddddddddddd-outside">Not a project row</div>
+  </aside>
+  <button id="click-trap">Do not click</button>
+  <script>
+    window.clicked = 0;
+    document.addEventListener('click', () => { window.clicked++; });
+  </script>
+</body>
+</html>

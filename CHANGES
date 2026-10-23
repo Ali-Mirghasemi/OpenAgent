@@ -1,3 +1,29 @@
+## 0.4.11 — 2026-10-23
+- Windows v0.4.10 passed 161 tests; draft-only `send_ready` but no visible
+  Project links were found in the authenticated browser.
+- Read-only Projects inventory now supports 2026 expandable sidebar rows with
+  public DOM project ID markers, as well as canonical anchor links.
+- Added optional bounded wait for sidebar hydration (`--wait-seconds`, 0–30).
+- Do not click UI, read nested chat lists, infer project membership, or submit.
+- Candidate Project overview URLs remain unverified; actual Project-selection
+  and project-scoped continuation are not implemented.
+- Added Chromium fixture tests for visible/hidden, malformed, delayed rows.
+
+## 0.4.10 — 2026-10-23
+- Windows v0.4.9 reported 503 `submit_unavailable` after typing in the authenticated
+  ChatGPT editor. Nothing was clicked; local mock/API registration still worked.
+- Recognize `#composer-submit-button` and other public Send selectors; scope Send
+  resolution to the active composer form where present. Reject multiple editors,
+  disabled controls, ambiguous form submits, and obvious non-send actions.
+  Do not fall back to Enter.
+- Add `browser chatgpt-compose-check` to type a harmless draft in an owned tab,
+  inspect Send readiness, close the tab, and guarantee no Send click.
+- Add `browser chatgpt-projects` read-only inventory for currently visible,
+  canonical project links. No project is selected or chat started.
+- Add project URL validation, synthetic Chromium Submit fixtures and safety tests.
+- Projects, model/thinking controls, file handling and OpenCode/9Router work are
+  explicitly retained in TODO. Live website compatibility remains unverified.
+
 ## 0.4.9 — 2026-10-23
 - User verified v0.4.8 on Windows (126 tests, local mock session API and outcome ledger).
 - Added strictly opt-in `--enable-chatgpt-conversations` alongside the existing

@@ -323,6 +323,50 @@ async def _chatgpt_status(args: argparse.Namespace) -> int:
         return 1
 
 
+
+async def _chatgpt_compose_check(args: argparse.Namespace) -> int:
+    """Dedicated tab preflight: harmless draft only; no Send clicks."""
+    from .browser import BrowserManager, BrowserError
+    from .providers.chatgpt_web import ChatGPTWebProvider
+    try:
+        config = replace(_browser_settings(args), allowed_origins=("https://chatgpt.com",))
+        async with BrowserManager(config) as manager:
+            result = await ChatGPTWebProvider(manager, timeout_s=10).check_composer_send()
+        print(json.dumps(result, indent=2))
+        return 0 if result["state"] == "send_ready" else 2
+    except (BrowserError, ValueError, OSError) as exc:
+        print(f"ChatGPT draft check failed ({type(exc).__name__}).")
+        return 1
+
+
+async def _chatgpt_projects(args: argparse.Namespace) -> int:
+    """Find visible project links and expandable project rows without clicking."""
+    from .browser import BrowserManager, BrowserError
+    from .providers.chatgpt_web import CHATGPT_URL
+    from .providers.chatgpt_projects import wait_for_chatgpt_projects
+    try:
+        config = replace(_browser_settings(args), allowed_origins=("https://chatgpt.com",))
+        async with BrowserManager(config) as manager:
+            page = await manager.open_tab("chatgpt-project-inventory", CHATGPT_URL)
+            try:
+                projects = await wait_for_chatgpt_projects(page, wait_seconds=args.wait_seconds)
+            finally:
+                await manager.close_tab("chatgpt-project-inventory")
+        if args.json:
+            print(json.dumps([project.as_dict() for project in projects], indent=2))
+        else:
+            for project in projects:
+                print(f"{project.name} [{project.id}]")
+                print(f"  {project.url}")
+            print(f"Visible ChatGPT projects: {len(projects)}")
+            print("Only visible sidebar links/rows are reported; this does not select a project.")
+            if not projects:
+                print("The Projects section may be collapsed, hidden, or not mounted in this layout.")
+        return 0
+    except (BrowserError, ValueError, OSError) as exc:
+        print(f"ChatGPT project discovery failed ({type(exc).__name__}).")
+        return 1
+
 def _api_check(args: argparse.Namespace) -> int:
     """Check a loopback OpenAgent server without displaying or storing secrets."""
     from urllib.parse import urlsplit
@@ -445,11 +489,17 @@ def main() -> None:
     chatgpt_status.add_argument("--wait-seconds", type=float, default=8.0, help="wait up to 0-30 seconds for the app UI to render (default 8)")
     chatgpt_status.add_argument("--screenshot", type=Path, help="OPTIONAL local PNG: may contain private chat/account details; never shared automatically")
 
+    compose_check = browser_sub.add_parser("chatgpt-compose-check", help="type a harmless draft and inspect Send WITHOUT submitting")
+    projects_cmd = browser_sub.add_parser("chatgpt-projects", help="list visible ChatGPT project links/rows without clicking or submitting")
+    projects_cmd.add_argument("--json", action="store_true", help="output visible project names and derived candidate URLs as JSON")
+    projects_cmd.add_argument("--wait-seconds", type=float, default=5.0,
+                              help="wait 0-30 seconds for sidebar rows to render (default 5)")
+
     fixture = browser_sub.add_parser("ui-test", help="submit one turn ONLY to a locally hosted UI fixture")
     fixture.add_argument("--url", default="http://127.0.0.1:8999/chat_fixture.html")
     fixture.add_argument("--message", default="Hello from OpenAgent")
 
-    for p in (diagnose, fixture, chatgpt_status):
+    for p in (diagnose, fixture, chatgpt_status, compose_check, projects_cmd):
         p.add_argument("--mode", choices=["persistent", "cdp"], default="persistent")
         p.add_argument("--browser", choices=["chromium", "chrome", "msedge", "firefox"])
         p.add_argument("--browser-path", type=Path)
@@ -475,6 +525,10 @@ def main() -> None:
             raise SystemExit(asyncio.run(_fixture_chat(args)))
         if args.browser_command == "chatgpt-status":
             raise SystemExit(asyncio.run(_chatgpt_status(args)))
+        if args.browser_command == "chatgpt-compose-check":
+            raise SystemExit(asyncio.run(_chatgpt_compose_check(args)))
+        if args.browser_command == "chatgpt-projects":
+            raise SystemExit(asyncio.run(_chatgpt_projects(args)))
         if args.browser_command == "open":
             try:
                 code = asyncio.run(_open_browser(args))

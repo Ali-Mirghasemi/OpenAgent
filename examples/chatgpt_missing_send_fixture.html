@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Missing send local</title></head>
+<body>
+<form id="other"><button type="submit">Wrong form</button></form>
+<div id="prompt-textarea" role="textbox" contenteditable="true"></div>
+<script>
+  window.sent = 0;
+  document.querySelector('#other').addEventListener('submit', e => { e.preventDefault(); window.sent++; });
+</script>
+</body></html>

@@ -40,8 +40,10 @@ CHATGPT_SELECTORS = UISelectors(
     ),
     send_button=(
         'button[data-testid="send-button"], '
+        'button#composer-submit-button, '
         'button[aria-label="Send message"], '
-        'button[aria-label="Send prompt"]'
+        'button[aria-label="Send prompt"], '
+        'button[aria-label*="Send" i]'
     ),
     assistant_message='[data-message-author-role="assistant"]',
     # Screenshot-verified logged-out layout (2026-10-20): plain "Log in"
@@ -207,7 +209,7 @@ class ChatGPTWebProvider(BrowserUIProvider):
                     if parse_chatgpt_conversation_id(page.url, expected_origin=origin) is not None:
                         raise BrowserUIError("unexpected_conversation", "new chat started at existing conversation")
                     baseline = await self._capture_baseline(page)
-                await page.locator(self.site.selectors.composer).fill(payload)
+                await self._fill_composer(page, payload)
                 send = await self._wait_for_send_ready(page)
                 if _origin(page.url) != origin or (upstream_conversation_id is not None and
                     parse_chatgpt_conversation_id(page.url, expected_origin=origin) != upstream_conversation_id):
@@ -239,6 +241,104 @@ class ChatGPTWebProvider(BrowserUIProvider):
             finally:
                 if page is not None:
                     await self.browser.close_tab(tab_id)
+
+    async def _visible_composer(self, page: Any) -> Any:
+        """Choose one visible editor; hidden responsive duplicates are ignored."""
+        nodes = page.locator(self.site.selectors.composer)
+        visible = []
+        for i in range(min(32, await nodes.count())):
+            candidate = nodes.nth(i)
+            if await candidate.is_visible():
+                visible.append(candidate)
+        if len(visible) != 1:
+            raise BrowserUIError("ui_changed", "expected exactly one visible message composer")
+        return visible[0]
+
+    async def _fill_composer(self, page: Any, payload: str) -> None:
+        composer = await self._visible_composer(page)
+        await composer.fill(payload)
+
+    async def _send_candidates(self, page: Any) -> list[Any]:
+        """Only consider Send in the active composer's form when one exists.
+
+        If a synthetic/older page has no form, use precise, named controls
+        (never an arbitrary page-wide submit, Voice or attachment button).
+        """
+        composer = await self._visible_composer(page)
+        form = composer.locator("xpath=ancestor::form[1]")
+        scope = form if await form.count() else page
+        primary = scope.locator(self.site.selectors.send_button)
+        primary_count = await primary.count()
+        if primary_count:
+            return [primary.nth(i) for i in range(min(32, primary_count))]
+        if await form.count():
+            # Some localized icon-only sends lack recognized English labels.
+            # Allow an unnamed submit only if it is the SOLE submit control
+            # in the active form. Never guess among multiple candidates.
+            submit = scope.locator('button[type="submit"]')
+            if await submit.count() == 1:
+                return [submit.first]
+        return []
+
+    async def _wait_for_send_ready(self, page: Any) -> Any:
+        """Resolve a visible enabled send control after typing, no fallback Enter.
+
+        Ambiguous errors are not retried because an Enter keypress may submit
+        a message rather than simply newline-edit the composer.
+        """
+        deadline = time.monotonic() + min(5.0, self.site.timeout_s)
+        while True:
+            state = await inspect_ui(page, self.site.selectors)
+            if state.state in (
+                "login_required", "security_challenge", "rate_limited",
+                "generation_in_progress", "browser_disconnected",
+            ):
+                raise BrowserUIError(state.state, "browser UI unavailable before submission: " + state.state)
+            for button in await self._send_candidates(page):
+                enabled = getattr(button, "is_enabled", None)
+                if not await button.is_visible() or (callable(enabled) and not await enabled()):
+                    continue
+                # A type=submit control in the active form can be icon-only;
+                # reject obvious microphone/attachment actions even if
+                # mistakenly coded as submits by a page revision.
+                get_attr = getattr(button, "get_attribute", None)
+                label = ((await get_attr("aria-label")) or "").lower() if callable(get_attr) else ""
+                if any(word in label for word in (
+                    "dictat", "microphone", "voice", "record", "upload",
+                    "attach", "cancel", "stop", "search", "audio",
+                )):
+                    continue
+                if callable(get_attr) and (await get_attr("aria-disabled") or "").lower() == "true":
+                    continue
+                return button
+            if time.monotonic() >= deadline:
+                raise BrowserUIError(
+                    "submit_unavailable", "no visible, enabled Send control after typing; nothing submitted",
+                )
+            await asyncio.sleep(min(self.site.poll_s, 0.2))
+
+    async def check_composer_send(self, *, draft: str = "OpenAgent draft-only send check") -> dict[str, Any]:
+        """Operator-initiated preflight: type an inert draft, NEVER click Send.
+
+        A dedicated tab is closed afterward. No draft/account text or raw
+        browser URL is logged. The page may transiently autosave the draft.
+        """
+        async with self._turn_lock:
+            await self.browser.start()
+            tab_id = "send-preflight-" + uuid.uuid4().hex
+            try:
+                page = await self.browser.open_tab(tab_id, self.site.url)
+                state = await inspect_ui(page, self.site.selectors)
+                if state.state != "ready":
+                    return {"state": state.state, "submitted": False}
+                await self._fill_composer(page, draft)
+                try:
+                    await self._wait_for_send_ready(page)
+                    return {"state": "send_ready", "submitted": False}
+                except BrowserUIError as exc:
+                    return {"state": exc.code, "submitted": False}
+            finally:
+                await self.browser.close_tab(tab_id)
 
     async def _capture_baseline(self, page: Any) -> TurnBaseline:
         return await snapshot_turns(page, self.site.selectors.assistant_message)

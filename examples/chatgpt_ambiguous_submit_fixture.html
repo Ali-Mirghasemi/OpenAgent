@@ -1,0 +1,5 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Ambiguous form fixture</title></head>
+<body><form id="composer"><div role="textbox" contenteditable="true" id="prompt-textarea"></div>
+<button type="submit">Action A</button><button type="submit">Action B</button></form>
+<script>window.submitted=0;document.querySelector('form').addEventListener('submit',e=>{e.preventDefault();window.submitted++;});</script>
+</body></html>

@@ -127,7 +127,7 @@ class BrowserUIProvider(Provider):
             # A completed-turn marker might belong to a prior message. Record
             # whether it was absent *before* this turn was submitted.
             done_was_absent = bool(s.response_complete and not await page.locator(s.response_complete).first.is_visible())
-            await page.locator(s.composer).fill(serialize_messages(messages))
+            await self._fill_composer(page, serialize_messages(messages))
             # The homepage may render an inactive/hidden Send button until
             # typing. Wait for a *visible and enabled* control before any
             # submission. Failure here is safe to retry (nothing was sent).
@@ -151,6 +151,10 @@ class BrowserUIProvider(Provider):
         finally:
             if page is not None:
                 await self.browser.close_tab(tab_id)
+
+    async def _fill_composer(self, page: Any, payload: str) -> None:
+        """Provider hook for choosing one composer; generic fixtures stay unchanged."""
+        await page.locator(self.site.selectors.composer).fill(payload)
 
     async def _capture_baseline(self, page: Any) -> Any:
         """Provider hook; generic websites can use conservative node counts."""
