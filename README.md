@@ -1,3 +1,27 @@
+### Project session binding (v0.4.15, verification-only)
+
+Windows v0.4.14 confirmed the user-selected Project destination (`verified`)
+with **185 tests passing**. The experimental local API now supports explicit
+Project association for a **new, empty** ChatGPT web session:
+
+```powershell
+$headers = @{ Authorization = "Bearer openagent-api" }
+$base = "http://127.0.0.1:12321"
+$session = Invoke-RestMethod -Method Post -Uri "$base/openagent/sessions" -Headers $headers -ContentType "application/json" -Body '{"model":"chatgpt-web/default"}'
+$body = '{"project_id":"g-p-YOUR_PROJECT_ID"}'
+Invoke-RestMethod -Method Post -Uri "$base/openagent/sessions/$($session.id)/project" -Headers $headers -ContentType "application/json" -Body $body
+```
+
+Start the server with `--enable-chatgpt-web --headful` and `OPENAGENT_API_TOKEN`
+configured first. Replace the example token and Project ID. The server
+rechecks the Projects inventory and correct Project destination in its own
+browser before binding SQLite metadata. **This does not send a message or
+activate Project-scoped chat.** Such sessions deliberately return HTTP 422 to
+`/sessions/{id}/turns` until a separately verified Project conversation
+implementation exists. See [Project session binding](docs/project-session-binding.md).
+
+---
+
 ### Project destination check (experimental, v0.4.14)
 
 Following the read-only Project inventory, choose an exact discovered Project

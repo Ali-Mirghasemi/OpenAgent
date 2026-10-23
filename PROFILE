@@ -1,3 +1,16 @@
+## v0.4.15 Project session binding boundary (2026-10-23)
+- On Windows, v0.4.14 passed 185 tests and Project Home verification succeeded
+  for the selected OpenAgent Project (route + main heading).
+- A Project ID can now be persisted only through an explicit authenticated
+  HTTP request to an unused local ChatGPT session. The server itself rechecks
+  the sidebar and Project Home; a previous CLI check cannot be spoofed as proof.
+- Store immutable `project` metadata separate from `upstream` chat identity.
+  Additive SQLite migration preserves old session databases.
+- A bound Project must not use ordinary `/sessions/{id}/turns`: currently HTTP
+  422 before any provider call or request claim; claim_turn guards races.
+- Do not claim that the Project binding enables message submission or upstream
+  Project conversation IDs. Those need separate UI validation and gating.
+
 ## v0.4.14 milestone (2026-10-23)
 - Windows v0.4.13: 173 tests passed; live sidebar scan discovered 14 Projects
   after the actual Show more button was expanded. A later scan saw 14 on load;

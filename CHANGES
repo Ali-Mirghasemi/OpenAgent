@@ -1,3 +1,18 @@
+## 0.4.15 — 2026-10-23
+- Windows v0.4.14 verified: 185 tests passed; the user-selected OpenAgent
+  Project returned `verified` with matching canonical route and main heading.
+- Add `POST /openagent/sessions/{id}/project` for explicit, authenticated
+  Project binding. Server repeats browser discovery and independent destination
+  verification; client-supplied Project ID alone is never authoritative.
+- Persist Project ID/name/verification timestamp with additive SQLite migration;
+  immutable binding requires a fresh empty session with no prior turns.
+- Fail closed: Project-bound sessions cannot submit via ordinary turn API.
+  Transactional claim guard prevents binding/submission races. No Project chat
+  messages or `/g/<project>/c/<chat>` continuation are implemented yet.
+- Unit/API, restart migration, denial/race and real Chromium fixture tests.
+- Next: gated, Project-native chat creation/continuation with verified membership;
+  model/effort, files and OpenCode/9Router remain future milestones.
+
 ## 0.4.14 — 2026-10-23
 - User confirmed v0.4.13 on Windows: 173 tests; `--load-all` expanded
   "Show more" once and discovered 14 Projects (up from five). A second

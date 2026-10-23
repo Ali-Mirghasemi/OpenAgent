@@ -61,3 +61,8 @@ class SessionCreate(BaseModel):
 class SessionTurn(BaseModel):
     request_id: str = Field(min_length=1, max_length=128)
     message: Message
+
+
+class ProjectBindRequest(BaseModel):
+    """Explicit user-selected Project ID; never accept a guessed name or URL."""
+    project_id: str = Field(min_length=1, max_length=128)

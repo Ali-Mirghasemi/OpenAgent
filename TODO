@@ -1,12 +1,25 @@
+## v0.4.15 — Verified Project association (no Project chat submission)
+- [x] Windows v0.4.14 validated: 185 tests and selected Project Home verified.
+- [x] Add authenticated API for explicitly binding a Project to an empty session
+      after fresh server-side route+main-heading verification.
+- [x] SQLite schema migration; immutable ID/name and verification timestamp.
+- [x] Refuse bindings when sessions have history, upstream IDs, or reserved turns.
+- [x] Fail closed for ordinary turn API and transactional claim race.
+- [x] Test with fake provider/API, DB restart and actual Chromium fixture.
+- [ ] Verify binding API on user's Windows, persistent logged-in profile.
+- [ ] Implement gated new Project chat routing and Project-chat identity and
+      membership verification before allowing a Project-bound session to send.
+- [ ] Model/reasoning options, files, OpenCode/9Router, additional providers.
+
 ## v0.4.14 — Read-only Project destination verification
 - [x] Verify v0.4.13 on Windows: 173 tests, 14 Projects, one Show more click.
 - [x] Add explicit Project ID selector and same-origin destination check.
 - [x] Require exact main heading AND canonical route before reporting verified.
 - [x] Reject Project redirect, login gate, wrong title and sidebar-only evidence.
 - [x] Add opt-in `--load-all` for IDs not immediately in the sidebar.
-- [ ] Validate destination check in Windows on the user-selected Project.
-- [ ] Bind verified Project identity to OpenAgent's local sessions and check
-      real project-scoped conversation IDs before enabling project submissions.
+- [x] Validate destination check in Windows on the user-selected Project.
+- [x] Persist verified Project identity for empty local sessions (v0.4.15).
+- [ ] Verify native Project chat IDs and membership before allowing submissions.
 - [ ] Live response completion, model/effort options, file transfers,
       OpenCode/9Router integration and additional providers.
 

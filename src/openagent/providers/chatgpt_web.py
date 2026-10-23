@@ -242,6 +242,43 @@ class ChatGPTWebProvider(BrowserUIProvider):
                 if page is not None:
                     await self.browser.close_tab(tab_id)
 
+    async def verify_project(self, project_id: str, *, wait_seconds: float = 8.0,
+                             max_steps: int = 30):
+        """Read-only, explicit UI verification for API Project binding.
+
+        Identifies the chosen Project from the sidebar, opens its overview
+        in a separate owned tab and requires a matching route and main heading.
+        Never writes to the webpage or submits a message.
+        """
+        from .chatgpt_projects import (
+            parse_project_url, scan_chatgpt_projects,
+            verify_chatgpt_project_destination,
+        )
+        origin = _origin(self.site.url)
+        if parse_project_url(f"{origin}/g/{project_id}/project", expected_origin=origin) != project_id:
+            raise ValueError("invalid Project identifier")
+        async with self._turn_lock:
+            await self.browser.start()
+            scan_id = "project-scan-" + uuid.uuid4().hex
+            home = await self.browser.open_tab(scan_id, self.site.url)
+            try:
+                report = await scan_chatgpt_projects(
+                    home, origin=origin, wait_seconds=wait_seconds, max_steps=max_steps,
+                )
+            finally:
+                await self.browser.close_tab(scan_id)
+            project = next((p for p in report.projects if p.id == project_id), None)
+            if project is None:
+                return None
+            destination_id = "project-check-" + uuid.uuid4().hex
+            page = await self.browser.open_tab(destination_id, project.url)
+            try:
+                return await verify_chatgpt_project_destination(
+                    page, project, origin=origin, wait_seconds=wait_seconds,
+                )
+            finally:
+                await self.browser.close_tab(destination_id)
+
     async def _visible_composer(self, page: Any) -> Any:
         """Choose one visible editor; hidden responsive duplicates are ignored."""
         nodes = page.locator(self.site.selectors.composer)

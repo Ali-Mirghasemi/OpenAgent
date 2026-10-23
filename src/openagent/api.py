@@ -13,7 +13,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from . import __version__
-from .models import CompletionRequest, Message, SessionCreate, SessionTurn
+from .models import CompletionRequest, Message, SessionCreate, SessionTurn, ProjectBindRequest
 from .registry import Registry
 from .store import SessionBusy, SessionNotFound, SessionStore
 
@@ -147,6 +147,43 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
         except SessionNotFound:
             raise HTTPException(404, "unknown session")
 
+    @app.post("/openagent/sessions/{session_id}/project")
+    async def bind_project(session_id: str, body: ProjectBindRequest):
+        """Bind only an empty session, after live read-only UI verification."""
+        from .providers.chatgpt_web import CHATGPT_MODEL
+        from .providers.chatgpt_projects import parse_project_url
+        if parse_project_url(f"https://chatgpt.com/g/{body.project_id}/project") != body.project_id:
+            return error_response("invalid Project ID", 422)
+        try:
+            session = store.get(session_id)
+        except SessionNotFound:
+            raise HTTPException(404, "unknown session")
+        if session["model"] != CHATGPT_MODEL:
+            return error_response("Project selection requires a ChatGPT web session", 422)
+        # Check before opening the browser; storage checks again atomically.
+        if session["messages"] or session["upstream"] or store.list_turns(session_id):
+            return error_response("Project binding requires an unused session", 409, "session_conflict")
+        if session["project"] and session["project"]["id"] != body.project_id:
+            return error_response("session already bound to a different Project", 409, "session_conflict")
+        provider = await registry.resolve(CHATGPT_MODEL)
+        verify = getattr(provider, "verify_project", None)
+        if not callable(verify):
+            return error_response("Project verification unavailable for this adapter", 422)
+        try:
+            result = await verify(body.project_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return error_response("Project verification unavailable; nothing bound", 503, "provider_error")
+        if result is None or result.state != "verified" or result.project_id != body.project_id:
+            return error_response("Project destination unverified; nothing bound", 409, "session_conflict")
+        try:
+            return store.bind_verified_project(session_id, result.project_id, result.project_name)
+        except SessionNotFound:
+            raise HTTPException(404, "unknown session")
+        except (SessionBusy, ValueError):
+            return error_response("Project binding conflict; nothing changed", 409, "session_conflict")
+
     @app.get("/openagent/sessions/{session_id}/turns")
     async def get_session_turns(session_id: str):
         try:
@@ -159,6 +196,10 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
         try:
             session = store.get(session_id)
             provider = await registry.resolve(session["model"])
+            # Project-scoped message routing is NOT implemented. Never send a
+            # bound session into the ordinary ChatGPT homepage by accident.
+            if session["project"] is not None:
+                return error_response("Project-scoped messaging not implemented; no request submitted", 422)
             # A bound upstream conversation must be continued by an adapter
             # that explicitly supports it, never silently restarted.
             if session["upstream"] and not provider.supports_upstream_conversations:
