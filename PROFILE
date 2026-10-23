@@ -1,3 +1,16 @@
+## v0.4.17 Project reply lifecycle (2026-10-23)
+- User confirmed v0.4.16 sent a Project-scoped prompt and ChatGPT generated the
+  expected response, but session API returned 502 and journal marked it unknown.
+- Actual Project chat URLs can contain a sanitized Project name suffix between
+  verified Project ID and `/c/<uuid>`; strict membership checks accept this.
+- Existing uncertain Project turns may be reconciled by an explicit authenticated
+  local API request, supplying the exact original user text and conversation URL;
+  the provider performs read-only public DOM verification and commits the response
+  and upstream ID atomically on success. It never clicks Send or replays.
+- Headful browser lifetime follows server lifetime; closing it by hand while
+  server runs may interrupt the managed session. Ctrl+C server shutdown closes it.
+- Unverified outcomes and unclear UI states always remain blocked.
+
 ## v0.4.16 experimental Project-native routing (2026-10-23)
 - Windows v0.4.15: all 191 tests passed; Project binding persisted with `ui_verified`.
 - Project-scoped session turns have a separate provider interface and require

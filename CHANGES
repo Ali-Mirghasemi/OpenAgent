@@ -1,3 +1,23 @@
+## 0.4.17 — 2026-10-23
+- Windows v0.4.16 verified: 207 tests passed and the first real Project-scoped
+  prompt was submitted and answered correctly on ChatGPT. The local session
+  nevertheless returned HTTP 502 and marked its outcome `unknown`.
+- Accept same-Project conversation routes with an optional lowercase slug:
+  `/g/<verified-project-id>[-slug]/c/<canonical-uuid>`; keep strict HTTPS/site,
+  full Project ID, and UUID checks. The actual UI used `-openagent`.
+- Expand the completion control to recognize an assistant-turn-scoped Copy
+  button and a conversation-turn wrapper, without trusting an older reply.
+- Add explicit, read-only `POST /openagent/sessions/{id}/turns/{request_id}/reconcile`:
+  requires an `unknown` turn, exact original message hash, unchanged Project
+  route, last visible matching user turn followed by a completed assistant turn.
+  It reads the existing reply and commits it atomically; it NEVER sends a message.
+- Return a sanitized failure code and `request_status: unknown` for failed
+  session turns. Continue preventing automatic replay of uncertain requests.
+- Keep headful persistent Chromium open while server is running by design;
+  server shutdown owns and closes its browser. No browser lifetime change.
+- Regression suite includes API/store, rejected URLs, local Chromium DOM,
+  real-world slug syntax, and read-only recovery with zero Submit clicks.
+
 ## 0.4.16 — 2026-10-23
 - Windows validated v0.4.15: 191/191 tests; authenticated HTTP Project binding
   returned `ui_verified` and persisted Project metadata in local SQLite.

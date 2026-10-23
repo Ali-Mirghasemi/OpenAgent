@@ -13,7 +13,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from . import __version__
-from .models import CompletionRequest, Message, SessionCreate, SessionTurn, ProjectBindRequest
+from .models import CompletionRequest, Message, SessionCreate, SessionTurn, ProjectBindRequest, ProjectTurnReconcile
 from .registry import Registry
 from .store import SessionBusy, SessionNotFound, SessionStore
 
@@ -242,8 +242,54 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
         except asyncio.CancelledError:
             store.fail_turn(session_id, body.request_id)
             raise
-        except Exception:
+        except Exception as exc:
+            from .providers.browser_ui import BrowserUIError
             store.fail_turn(session_id, body.request_id)
-            return error_response("turn failed; request will not be automatically retried", 502, "provider_error")
+            # Preserve a categorized reason without leaking DOM content or
+            # credentials. Outcome stays unknown, so callers MUST NOT retry.
+            code = exc.code if isinstance(exc, BrowserUIError) else "turn_outcome_unknown"
+            return JSONResponse({"error": {
+                "message": "turn outcome unverified; request will not be automatically retried",
+                "type": "provider_error", "code": code, "request_status": "unknown",
+            }}, status_code=502)
+
+    @app.post("/openagent/sessions/{session_id}/turns/{request_id}/reconcile")
+    async def reconcile_project_turn(session_id: str, request_id: str, body: ProjectTurnReconcile):
+        """Explicit read-only remote verification; NEVER submits a message."""
+        from .providers.browser_ui import BrowserUIError
+        try:
+            session = store.get(session_id)
+            project = session["project"]
+            if project is None:
+                return error_response("Only Project-bound unknown turns can be reconciled", 422)
+            provider = await registry.resolve(session["model"])
+            reconcile = getattr(provider, "reconcile_project_turn", None)
+            if not (provider.supports_upstream_conversations and
+                    getattr(provider, "supports_project_messages", False) and callable(reconcile)):
+                return error_response("Project read-only reconciliation is not enabled", 422)
+            if body.message.role != "user" or not isinstance(body.message.content, str):
+                return error_response("Reconciliation requires the original plain-text user message", 422)
+            store.require_unknown_project_turn(
+                session_id, request_id, body.message, expected_project_id=project["id"],
+            )
+            output = await reconcile(
+                project_id=project["id"], project_name=project["name"],
+                conversation_url=body.conversation_url, user_message=body.message.content,
+            )
+            stored = store.complete_turn(
+                session_id, request_id, body.message, output,
+                supports_upstream_conversations=True, reconcile_unknown=True,
+            )
+            return {"reconciled": True, "output": stored, "session_id": session_id}
+        except SessionNotFound:
+            raise HTTPException(404, "unknown session")
+        except SessionBusy:
+            return error_response("Turn cannot be reconciled; journal state is unchanged", 409, "session_conflict")
+        except (BrowserUIError, ValueError, TypeError):
+            return error_response("Project reply could not be verified; nothing changed", 409, "provider_error")
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return error_response("Project reconciliation failed; nothing changed", 503, "provider_error")
 
     return app

@@ -70,7 +70,9 @@ CHATGPT_SELECTORS = UISelectors(
 # A copy button on an earlier turn cannot complete the current request.
 TURN_COPY_BUTTON = (
     'button[data-testid="copy-turn-action-button"],'
-    'button[aria-label*="Copy message"]'
+    'button[aria-label="Copy"],'
+    'button[aria-label="Copy message"],'
+    'button[aria-label="Copy response"]'
 )
 TURN_PENDING = (
     '[aria-busy="true"], [class*="loading-shimmer"],'
@@ -108,15 +110,33 @@ def chatgpt_conversation_url(origin: str, conversation_id: str) -> str:
     return f"{origin}/c/{conversation_id}"
 
 
+def _project_segment_matches(segment: str, project_id: str) -> bool:
+    """Accept exactly the verified ID, optionally followed by a UI slug.
+
+    ChatGPT's public Project chats can use ``g-p-<id>-project-name`` even
+    though Project Home and sidebar identity use ``g-p-<id>``. Never infer a
+    different project from a shared prefix, an arbitrary URL, or a slug alone.
+    """
+    import re
+    if segment == project_id:
+        return True
+    prefix = project_id + "-"
+    if not segment.startswith(prefix):
+        return False
+    slug = segment[len(prefix):]
+    return bool(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug) and len(slug) <= 100)
+
+
 def parse_project_conversation_id(url: str, project_id: str, *,
                                   expected_origin: str = "https://chatgpt.com") -> str | None:
-    """Accept only /g/<exact project>/c/<canonical uuid> on the trusted origin."""
+    """Accept only same-project /g/<id>[-slug]/c/<canonical uuid> routes."""
     try:
         parts = urlsplit(url)
         if _origin(url) != expected_origin or parts.query or parts.fragment:
             return None
         path = parts.path.split("/")
-        if len(path) != 5 or path[1:3] != ["g", project_id] or path[3] != "c":
+        if (len(path) != 5 or path[1] != "g" or
+            not _project_segment_matches(path[2], project_id) or path[3] != "c"):
             return None
         if parse_project_url(f"{expected_origin}/g/{project_id}/project", expected_origin=expected_origin) != project_id:
             return None
@@ -363,6 +383,80 @@ class ChatGPTWebProvider(BrowserUIProvider):
                 if page is not None:
                     await self.browser.close_tab(tab_id)
 
+    async def reconcile_project_turn(
+        self, *, project_id: str, project_name: str,
+        conversation_url: str, user_message: str,
+    ) -> ProviderOutput:
+        """Read-only manual reconciliation of a *previously submitted* turn.
+
+        This never clicks Send or types. The API validates that the journal has
+        one matching unknown turn before invoking it. Only the final visible
+        user/assistant pair is eligible, and completion must be scoped to the
+        assistant turn. Do not leak page text when verification fails.
+        """
+        if not self.supports_project_messages or not self.supports_upstream_conversations:
+            raise BrowserUIError("project_messages_disabled", "Project reconciliation is disabled")
+        origin = _origin(self.site.url)
+        expected_chat = parse_project_conversation_id(
+            conversation_url, project_id, expected_origin=origin,
+        )
+        if expected_chat is None or not project_name or not isinstance(user_message, str) or not user_message:
+            raise BrowserUIError("reconcile_unverified", "Project conversation URL or message is invalid")
+        async with self._turn_lock:
+            await self.browser.start()
+            tab_id = "project-reconcile-" + uuid.uuid4().hex
+            page = None
+            try:
+                page = await self.browser.open_tab(tab_id, conversation_url)
+                previous, stable = None, 0
+                deadline = time.monotonic() + min(12.0, self.site.timeout_s)
+                while time.monotonic() < deadline:
+                    if (parse_project_conversation_id(page.url, project_id, expected_origin=origin)
+                            != expected_chat):
+                        raise BrowserUIError("project_mismatch", "Project conversation navigation changed")
+                    state = await inspect_ui(page, self.site.selectors)
+                    if state.state in ("login_required", "security_challenge", "rate_limited", "browser_disconnected"):
+                        raise BrowserUIError("reconcile_unverified", "Project page unavailable for reconciliation")
+                    users = page.locator('[data-message-author-role="user"]')
+                    assistants = page.locator(self.site.selectors.assistant_message)
+                    if await users.count() and await assistants.count():
+                        user = users.last
+                        assistant = assistants.last
+                        # These are DOM nodes, not model responses. Check exact
+                        # user text and that the assistant follows the user.
+                        found_text = " ".join((await user.inner_text()).split())
+                        expected_text = " ".join(user_message.split())
+                        follows = await page.evaluate("""(args) => {
+                            const u = args[0], a = args[1];
+                            return !!(u && a && (u.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING));
+                        }""", [await user.element_handle(), await assistant.element_handle()])
+                        if found_text == expected_text and follows:
+                            copy_ready = await self._turn_copy_ready(assistant)
+                            pending = await assistant.locator(TURN_PENDING).count() > 0
+                            markdown = assistant.locator('.markdown')
+                            text = ((await markdown.first.inner_text()) if await markdown.count()
+                                    else (await assistant.inner_text())).strip()
+                            if text and text == previous:
+                                stable += 1
+                            else:
+                                previous, stable = text, 1 if text else 0
+                            if (stable >= self.site.stable_observations and copy_ready
+                                    and not pending and state.state != "generation_in_progress"):
+                                return ProviderOutput(content=text, upstream_conversation_id=expected_chat)
+                        else:
+                            previous, stable = None, 0
+                    await asyncio.sleep(self.site.poll_s)
+                raise BrowserUIError("reconcile_unverified", "The matching completed Project turn was not verified")
+            except BrowserUIError:
+                raise
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                raise BrowserUIError("reconcile_unverified", "Could not verify Project reply") from exc
+            finally:
+                if page is not None:
+                    await self.browser.close_tab(tab_id)
+
     async def verify_project(self, project_id: str, *, wait_seconds: float = 8.0,
                              max_steps: int = 30):
         """Read-only, explicit UI verification for API Project binding.
@@ -498,6 +592,23 @@ class ChatGPTWebProvider(BrowserUIProvider):
             finally:
                 await self.browser.close_tab(tab_id)
 
+    async def _turn_copy_ready(self, assistant: Any) -> bool:
+        """Completion must belong to this assistant turn, not prior history.
+
+        Current layouts can put the action toolbar under the article, under a
+        wider conversation-turn container, or inside the assistant node.
+        Never accept a global page-wide Copy action as completion evidence.
+        """
+        scopes = (
+            assistant.locator("xpath=ancestor::article[1]"),
+            assistant.locator('xpath=ancestor::*[starts-with(@data-testid, "conversation-turn-")][1]'),
+            assistant,
+        )
+        for scope in scopes:
+            if await scope.count() and await scope.locator(TURN_COPY_BUTTON).first.is_visible():
+                return True
+        return False
+
     async def _capture_baseline(self, page: Any) -> TurnBaseline:
         return await snapshot_turns(page, self.site.selectors.assistant_message)
 
@@ -526,9 +637,7 @@ class ChatGPTWebProvider(BrowserUIProvider):
                 candidate_key = "id:" + ident if ident else "count-fallback"
                 if candidate_key != active_key:
                     active_key, previous, stable = candidate_key, None, 0
-                article = new_turn.locator("xpath=ancestor::article[1]")
-                scope = article if await article.count() else new_turn
-                copy_ready = await scope.locator(TURN_COPY_BUTTON).first.is_visible()
+                copy_ready = await self._turn_copy_ready(new_turn)
                 pending = await new_turn.locator(TURN_PENDING).count() > 0
                 rendering = state.state == "generation_in_progress"
                 markdown = new_turn.locator(".markdown")

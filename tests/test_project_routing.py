@@ -152,3 +152,20 @@ def test_atomic_project_gate_rejects_mismatch_and_unscoped_turns(tmp_path):
 def test_project_provider_rejects_opt_in_without_conversation_capability():
     with pytest.raises(ValueError, match='require'):
         ChatGPTWebProvider(SimpleNamespace(config=SimpleNamespace(allowed_origins=())), enable_project_messages=True)
+
+
+def test_project_slugged_live_route_and_near_misses():
+    slugged = f'{ORIGIN}/g/{PROJECT_ID}-openagent/c/{CID}'
+    assert parse_project_conversation_id(slugged, PROJECT_ID) == CID
+    assert parse_project_conversation_id(f'{ORIGIN}/g/{PROJECT_ID}-openagent-v2/c/{CID}', PROJECT_ID) == CID
+    for url in [
+        f'{ORIGIN}/g/{OTHER_ID}-openagent/c/{CID}',
+        f'{ORIGIN}/g/{PROJECT_ID}evil/c/{CID}',
+        f'{ORIGIN}/g/{PROJECT_ID}-bad%2Fslug/c/{CID}',
+        f'{ORIGIN}/g/{PROJECT_ID}-/c/{CID}',
+        f'{ORIGIN}/g/{PROJECT_ID}-OpenAgent/c/{CID}',
+        f'{ORIGIN}/g/{PROJECT_ID}-openagent/c/{CID}?x=1',
+        f'https://other.example/g/{PROJECT_ID}-openagent/c/{CID}',
+        f'{ORIGIN}/g/{PROJECT_ID}-openagent/c/{CID}/extra',
+    ]:
+        assert parse_project_conversation_id(url, PROJECT_ID) is None

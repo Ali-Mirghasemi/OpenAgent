@@ -1,3 +1,17 @@
+### v0.4.17 Project conversation recovery (experimental)
+
+ChatGPT can navigate to `/g/<project-id>-<name>/c/<uuid>` after the first
+Project-scoped submission. v0.4.17 validates this route without weakening the
+verified Project boundary. If a turn was already submitted but the local session
+was marked `unknown`, **do not resend it**. The opt-in read-only
+`POST /openagent/sessions/{id}/turns/{request_id}/reconcile` verifies the exact
+original user message and a completed reply on the existing Project URL before
+committing it to SQLite. See `docs/project-native-routing.md`.
+
+The visible Chromium window stays open while the `serve --headful` process runs.
+Stop the server with Ctrl+C to close its managed browser. No new authentication,
+model, files, or native-tool capabilities are claimed by this release.
+
 ### Project session binding (v0.4.15, verification-only)
 
 Windows v0.4.14 confirmed the user-selected Project destination (`verified`)

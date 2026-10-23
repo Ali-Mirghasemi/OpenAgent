@@ -97,3 +97,27 @@ async def test_wrong_project_redirect_never_clicks_send(tmp_path):
         assert exc.value.code == 'project_unverified'
         assert route.closed == [0]
         assert browser.status().open_tabs == 0
+
+@pytest.mark.asyncio
+async def test_project_chat_slugged_post_submit_url_is_accepted(tmp_path):
+    """Regression: real ChatGPT appends a name slug before /c/<uuid>."""
+    binary = find_chromium_executable()
+    if binary is None:
+        pytest.skip('No Chromium executable')
+    pytest.importorskip('playwright')
+    browser = BrowserManager(BrowserConfig(profile_dir=tmp_path/'temp'), backend=LocalContentBackend(binary, HTML))
+    async with browser:
+        route = RouteBrowser(browser)
+        provider = ChatGPTWebProvider(route, url=ORIGIN+'/', timeout_s=1, poll_s=.02,
+                                      enable_conversation_continuation=True, enable_project_messages=True)
+        async def completed(page, baseline, _):
+            assert await page.evaluate('window.sent') == 1
+            page.url = f'{ORIGIN}/g/{PROJECT_ID}-openagent/c/{CID}'
+            return 'OpenAgent Project test received.'
+        provider._wait_for_answer = completed
+        result = await provider.complete_in_project_session(
+            CHATGPT_MODEL, [Message(role='user', content='Hello')],
+            project_id=PROJECT_ID, project_name='OpenAgent', upstream_conversation_id=None)
+        assert result.upstream_conversation_id == CID
+        assert result.content == 'OpenAgent Project test received.'
+        assert route.closed == [1]

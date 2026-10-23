@@ -28,7 +28,7 @@ Invoke-RestMethod -Uri "$base/openagent/sessions/$sid/turns" -Method Post -Heade
 The first turn opens `/g/<bound-id>/project`, waits for an exact visible
 Project heading in `main`, checks UI readiness, fills the newest user message,
 verifies the Project route again and clicks Send once. The answer must have a
-new completed assistant turn and navigate to `/g/<bound-id>/c/<uuid>`.
+new completed assistant turn and navigate to `/g/<bound-id>[-slug]/c/<uuid>`.
 Follow-ups reopen precisely that Project conversation URL, require visible
 prior assistant history, submit only the newest user message and check that
 both Project and chat UUID remain unchanged. Redirects or unverified history
@@ -42,3 +42,41 @@ selects model/reasoning options, handles files or supports native tool calls.
 
 The tests use local HTML in disposable Chromium profiles or fake provider
 methods. They do not log in, touch personal profiles or contact ChatGPT.
+
+## v0.4.17: recover an already-submitted unknown Project turn
+
+In the live Windows test, ChatGPT **received and answered** the prompt but the
+bridge reported 502 because the URL contained a Project-name suffix, for example
+`/g/g-p-<32 hex>-openagent/c/<uuid>`. Both the canonical and slugged variant are
+now recognized, but only when the entire Project ID matches the saved binding.
+
+If the local journal lists the earlier request as `unknown`, do not send it again.
+Stop and restart the server with the same three experimental opt-in flags, then
+copy the exact existing Project conversation URL from the browser address bar.
+The endpoint below reads that conversation; it does **not** click Send:
+
+```powershell
+$base = 'http://127.0.0.1:12321'
+$headers = @{ Authorization = "Bearer $env:OPENAGENT_API_TOKEN" }
+$sid = '<existing-session-id>'
+$requestId = '<previous-unknown-request-id>'
+$conversationUrl = 'https://chatgpt.com/g/<project-id>-<slug>/c/<uuid>'
+$body = @{
+  message = @{ role='user'; content='<EXACT original user message>' }
+  conversation_url = $conversationUrl
+} | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$base/openagent/sessions/$sid/turns/$requestId/reconcile" `
+    -Method Post -Headers $headers -ContentType 'application/json' -Body $body
+```
+
+Requirements: same original request hash in SQLite (`unknown` status only),
+verified saved Project binding, exact Project+conversation URL, matching visible
+*last* user message, a later assistant reply that is stable and exposes a scoped
+Copy action, and no generation pending. On failure, nothing is committed and the
+unknown turn remains blocked. No automatic retries, cookie extraction or
+private endpoints are used. The recovered output contains the existing reply and
+the upstream chat UUID, permitting later continuation under the same session.
+
+Because `serve --headful` uses one persistent browser profile, the window stays
+open between requests. Stop the server to close it safely; don't close the
+window during an active turn.

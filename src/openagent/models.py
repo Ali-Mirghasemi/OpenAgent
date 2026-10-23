@@ -66,3 +66,9 @@ class SessionTurn(BaseModel):
 class ProjectBindRequest(BaseModel):
     """Explicit user-selected Project ID; never accept a guessed name or URL."""
     project_id: str = Field(min_length=1, max_length=128)
+
+
+class ProjectTurnReconcile(BaseModel):
+    """Explicit opt-in to inspect one already-submitted Project conversation."""
+    message: Message
+    conversation_url: str = Field(min_length=20, max_length=512)

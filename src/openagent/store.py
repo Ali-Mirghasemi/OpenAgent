@@ -177,8 +177,29 @@ class SessionStore:
             )
         return None
 
+    def require_unknown_project_turn(self, session_id: str, request_id: str, user: Message,
+                                     *, expected_project_id: str) -> None:
+        """Preflight a manual recovery without changing the session journal."""
+        payload_hash = hashlib.sha256(json.dumps(
+            user.model_dump(mode="json", exclude_none=True), sort_keys=True,
+        ).encode()).hexdigest()
+        session = self.db.execute(
+            "SELECT project_id FROM sessions WHERE id=?", (session_id,),
+        ).fetchone()
+        if session is None:
+            raise SessionNotFound(session_id)
+        if session["project_id"] != expected_project_id:
+            raise SessionBusy("Project binding mismatch")
+        turn = self.db.execute(
+            "SELECT status,payload_hash FROM turns WHERE session_id=? AND request_id=?",
+            (session_id, request_id),
+        ).fetchone()
+        if turn is None or turn["status"] != "unknown" or turn["payload_hash"] != payload_hash:
+            raise SessionBusy("Only an unknown turn with identical original message can be reconciled")
+
     def complete_turn(self, session_id: str, request_id: str, user: Message, output: ProviderOutput,
-                      *, supports_upstream_conversations: bool = False) -> dict[str, Any]:
+                      *, supports_upstream_conversations: bool = False,
+                      reconcile_unknown: bool = False) -> dict[str, Any]:
         """Atomically commit both transcript messages and a replayable reply."""
         payload = output.model_dump(mode="json")
         with self.db:
@@ -191,8 +212,12 @@ class SessionStore:
             turn = self.db.execute(
                 "SELECT status FROM turns WHERE session_id=? AND request_id=?", (session_id, request_id)
             ).fetchone()
-            if turn is None or turn["status"] != "pending":
-                raise SessionBusy("turn is not pending; refusing to append transcript")
+            status_required = "unknown" if reconcile_unknown else "pending"
+            if turn is None or turn["status"] != status_required:
+                raise SessionBusy(
+                    "turn is not unknown; refusing to reconcile transcript"
+                    if reconcile_unknown else "turn is not pending; refusing to append transcript"
+                )
             previous = row["upstream_conversation_id"]
             reported = output.upstream_conversation_id
             if reported is not None:
@@ -208,8 +233,8 @@ class SessionStore:
                 (json.dumps(entries), utcnow(), reported, session_id),
             )
             self.db.execute(
-                "UPDATE turns SET status='done',response=? WHERE session_id=? AND request_id=? AND status='pending'",
-                (json.dumps(payload), session_id, request_id),
+                "UPDATE turns SET status='done',response=? WHERE session_id=? AND request_id=? AND status=?",
+                (json.dumps(payload), session_id, request_id, status_required),
             )
         return payload
 

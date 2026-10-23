@@ -1,3 +1,14 @@
+## v0.4.17 — Project chat completion and manual reconciliation
+- [x] Recognize the actual `/g/<project-id>-openagent/c/<uuid>` URL format.
+- [x] Strengthen assistant-turn-scoped Copy completion control detection.
+- [x] Add opt-in, read-only reconciliation for an unknown Project turn; match
+      exact original request and existing completed remote answer, never resend.
+- [x] Preserve unknown-outcome lock until verified reconciliation succeeds.
+- [ ] Validate read-only recovery against live ChatGPT on Windows.
+- [ ] Verify a second Project turn using the same upstream chat after recovery.
+- [ ] Model and thinking-level controls, Project resources, file transfer,
+      OpenCode/9Router, native tool calls, other providers still pending.
+
 ## v0.4.16 — Opt-in Project-scoped session turns
 - [x] Windows verified v0.4.15: 191 tests, Project ID/name persisted.
 - [x] Add explicit provider Project-turn path and independent CLI enable flag.
