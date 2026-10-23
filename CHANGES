@@ -1,3 +1,19 @@
+## 0.4.9 — 2026-10-23
+- User verified v0.4.8 on Windows (126 tests, local mock session API and outcome ledger).
+- Added strictly opt-in `--enable-chatgpt-conversations` alongside the existing
+  `--enable-chatgpt-web` flag; one-shot browser adapter remains the default.
+- Added canonical same-origin `/c/<uuid>` URL parser and route-preserving
+  pre-submit checks for provider-issued conversation identity.
+- Experimental per-session ChatGPT DOM continuation: after a verifiable new
+  answer, require route identity before persisting; on resume, require a
+  matching URL and visible prior assistant history and send only the new turn.
+- Retain exactly-once intent and fail closed on post-submit route ambiguity;
+  SQLite journals unknown outcomes and blocks unsupervised retry.
+- Added synthetic browser/session tests for restarts, cached request IDs,
+  missing/changed routes, unsafe URLs, missing history and flag defaults.
+- No live ChatGPT submission, official provider permission, or actual
+  upstream account compatibility is claimed; persistent_chat remains unknown.
+
 ## 0.4.8 — 2026-10-20
 - User verified v0.4.7 installation on Windows, 114 tests passed, and signed-in
   browser UI readiness still returns `ready` without an active Send button.

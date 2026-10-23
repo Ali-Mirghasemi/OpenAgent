@@ -381,6 +381,7 @@ def main() -> None:
     serve.add_argument("--strict-port", action="store_true", help="disable automatic fallback for reserved/busy ports")
     serve.add_argument("--database", type=Path, default=Path.home() / ".openagent" / "sessions.db")
     serve.add_argument("--enable-chatgpt-web", action="store_true", help="EXPERIMENTAL opt-in for ChatGPT public UI; requires a permitted session")
+    serve.add_argument("--enable-chatgpt-conversations", action="store_true", help="EXPERIMENTAL session continuation using verified /c/<uuid> route; requires --enable-chatgpt-web")
     serve.add_argument("--mode", choices=["persistent", "cdp"], default="persistent")
     serve.add_argument("--browser", choices=["chromium", "chrome", "msedge", "firefox"])
     serve.add_argument("--browser-path", type=Path)
@@ -485,6 +486,8 @@ def main() -> None:
             raise SystemExit(code)
         raise SystemExit(asyncio.run(_probe_browser(args)))
 
+    if args.enable_chatgpt_conversations and not args.enable_chatgpt_web:
+        parser.error("--enable-chatgpt-conversations requires --enable-chatgpt-web")
     token = os.environ.get("OPENAGENT_API_TOKEN") or None
     # Unlike the mock, this adapter can act on a real signed-in account.
     # Require authentication even when the HTTP listener is loopback-only.
@@ -510,11 +513,15 @@ def main() -> None:
         try:
             config = replace(_browser_settings(args), allowed_origins=("https://chatgpt.com",))
             browser_manager = BrowserManager(config)
-            registry.register(ChatGPTWebProvider(browser_manager))
+            registry.register(ChatGPTWebProvider(
+                browser_manager, enable_conversation_continuation=args.enable_chatgpt_conversations,
+            ))
         except (ValueError, OSError) as exc:
             parser.error(f"invalid ChatGPT browser configuration: {exc}")
         print("EXPERIMENTAL ChatGPT UI adapter: no plan/model verification, no native tools, no automatic login.", flush=True)
         print("Only use where the provider permits automated interaction; account challenges stop the request.", flush=True)
+        if args.enable_chatgpt_conversations:
+            print("EXPERIMENTAL: /c/<uuid> continuation is fixture-tested only; no live ChatGPT validation.", flush=True)
     store = SessionStore(args.database)
     try:
         uvicorn.run(create_app(registry, store, api_token=token, browser_manager=browser_manager),

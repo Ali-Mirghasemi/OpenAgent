@@ -1,3 +1,26 @@
+# OpenAgent Bridge v0.4.9 — Experimental conversation routing
+
+Windows v0.4.8 was validated with 126 passing tests and a successful local
+`mock/echo` session API run. This release adds a **separately opt-in**,
+fixture-tested ChatGPT continuation protocol using a verified `/c/<uuid>`
+conversation route and the existing SQLite request journal. It is **disabled
+by default** and has not been tested by submitting a message to live ChatGPT.
+The previous `--enable-chatgpt-web` flag alone keeps one-shot behavior.
+
+For Windows installation from v0.4.8:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,browser]"
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful --details
+```
+
+See [experimental conversation routing](docs/conversation-routing-preview.md)
+for operator controls, route-identity safeguards, limitations and local tests.
+Do not enable account-backed automation where the service does not permit it.
+
+---
+
 # OpenAgent Bridge v0.4.8 — Session continuation foundation
 
 This update adds **durable upstream conversation identity** as an optional,

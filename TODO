@@ -1,3 +1,18 @@
+## v0.4.9 — Experimental upstream chat routing
+- [x] Preserve existing one-shot ChatGPT adapter unless extra opt-in flag set.
+- [x] Strictly match same-origin `/c/<uuid>` routes; reject redirects and unsafe URLs.
+- [x] Bind provider-observed route after completed turn and verify resumed route
+      and existing visible assistant history before the next submission.
+- [x] Send only the newest user text on upstream continuation, never replay
+      the already persisted local transcript into the upstream thread.
+- [x] Block uncertain/mismatched post-submit routes and retain journal safety.
+- [x] Test two-turn, SQLite restart, idempotency and failure cases offline.
+- [ ] Verify actual ChatGPT route, selectors, completion and provider permission
+      before calling upstream continuity supported or enabling by default.
+- [ ] Design manual reconciliation for unknown remote outcomes and operator
+      confirmation to resume; never silently retry.
+- [ ] Build permitted live integration and OpenCode/9Router client tests.
+
 ## v0.4.8 — Local/upstream conversation continuity foundation
 - [x] Store optional provider-reported upstream IDs beside local session state.
 - [x] Preserve v0.4.7 databases through an additive SQLite migration.
