@@ -1,3 +1,11 @@
+## v0.4.24 — Human-verification handling
+- [x] Classify visible Cloudflare challenge pages as `security_challenge`.
+- [x] Stop read-only control scans without misreporting unavailable controls.
+- [x] Keep Project page reads fail-closed on human-verification challenges.
+- [ ] Verify detection in the user's live managed browser after installing.
+- [ ] Persist exact slugged Project conversation route and fix reply extraction.
+- [ ] Implement verified UI model/effort selection, uploads and other controls.
+
 ## v0.4.23 — Bounded control-inventory readiness
 - [x] Windows v0.4.22: 250 tests; `chatgpt-controls --headful` twice returned
       `ui_changed` and all controls `not_detected` after only `DOMContentLoaded`.

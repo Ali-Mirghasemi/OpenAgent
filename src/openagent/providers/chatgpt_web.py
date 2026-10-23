@@ -18,6 +18,7 @@ from typing import Any
 
 from ..browser.diagnostics import UIObservation, UISelectors, inspect_ui
 from ..browser.surface import observe_status, inspect_surface
+from ..browser.challenge import inspect_human_verification
 from ..browser.manager import BrowserManager, BrowserNavigationError, _origin
 from ..capabilities import Capabilities, Feature
 from ..models import Message, ProviderOutput
@@ -63,6 +64,7 @@ CHATGPT_SELECTORS = UISelectors(
         'button:text-is("Sign in"), a:text-is("Sign in")'
     ),
     security_challenge='iframe[src*="challenges.cloudflare.com"], [id*="challenge-running"]',
+    human_verification_probe=True,
     rate_limited='[data-testid="rate-limit-error"]',
     generation_in_progress='button[data-testid="stop-button"]',
     response_complete='button[data-testid="copy-turn-action-button"]',
@@ -361,6 +363,8 @@ class ChatGPTWebProvider(BrowserUIProvider):
         """
         deadline = time.monotonic() + wait_seconds
         while True:
+            if await inspect_human_verification(page):
+                raise BrowserUIError("security_challenge", "Human verification required; no request replay")
             code = await chatgpt_page_error(page)
             if code is not None:
                 raise BrowserUIError(code, "ChatGPT conversation unavailable; no request replay")
@@ -387,7 +391,15 @@ class ChatGPTWebProvider(BrowserUIProvider):
                 observed, _status_controls, _elapsed = await observe_status(
                     page, self.site.selectors, wait_seconds=wait_seconds,
                 )
-                controls = await chatgpt_feature_inventory(page)
+                if observed.state == "security_challenge":
+                    # Controls are inaccessible, not missing, on a human
+                    # verification page. Never inspect menus or interact.
+                    controls = {key: "unavailable" for key in (
+                        "model_picker", "effort_picker", "attachment_button",
+                        "file_input", "voice_button", "tools_menu",
+                    )}
+                else:
+                    controls = await chatgpt_feature_inventory(page)
                 # Optional controls may mount after the composer. A stable
                 # READY state alone cannot establish their absence. If no
                 # optional control has appeared, use the remaining budget;

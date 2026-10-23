@@ -1,3 +1,17 @@
+## 0.4.24 — 2026-10-23
+- Windows v0.4.23: 253 tests passed, but `chatgpt-controls` waited 15 seconds
+  on a Cloudflare Verify you are human page without detecting ChatGPT UI.
+- Add opt-in top-level human-verification inspection to ChatGPT status and
+  control inventory; report `security_challenge` with finite evidence rather
+  than `ui_changed`. A complete HTML document is not a hydrated chat UI.
+- Report optional model/effort/upload controls as `unavailable` on challenges.
+  Project read preflight also refuses the challenge before a route-mismatch
+  check; never replay an uncertain request or interact with the CAPTCHA.
+- Chromium regression fixtures cover title, DOM marker, visible challenge
+  text, delayed pages, harmless user-chat phrases, and non-mutating diagnostics.
+- Document normal manual sign-in with `browser open`. No challenge bypass,
+  model picker actions, file uploads, or Project-answer repair are implemented.
+
 ## 0.4.23 — 2026-10-23
 - Correct control-inventory readiness: `open_tab` waited only for DOMContentLoaded,
   which often precedes client-side ChatGPT composer/control hydration.

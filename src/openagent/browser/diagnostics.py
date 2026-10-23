@@ -29,6 +29,8 @@ class UISelectors:
     # Some UIs hide/disable Send until the composer has input. Explicit opt-in
     # avoids relaxing readiness rules for ordinary browser providers.
     send_button_may_appear_after_input: bool = False
+    # Explicit provider opt-in: inspect challenge-page DOM without reading chat.
+    human_verification_probe: bool = False
 
     def __post_init__(self) -> None:
         for field in ("composer", "send_button", "assistant_message"):
@@ -85,6 +87,11 @@ async def inspect_ui(page: PageLike, selectors: UISelectors) -> UIObservation:
         return await _any_visible(page, selector)
 
     try:
+        if selectors.human_verification_probe:
+            from .challenge import inspect_human_verification
+            evidence = await inspect_human_verification(page)
+            if evidence:
+                return UIObservation("security_challenge", evidence)
         for field, state in (
             ("security_challenge", "security_challenge"),
             ("login_required", "login_required"),

@@ -102,7 +102,7 @@ async def test_delayed_error_redirect_is_not_reported_as_route_mismatch(tmp_path
         assert proxy.click_counts == [0]
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('reason', ['conversation_access_denied', 'conversation_unavailable'])
+@pytest.mark.parametrize('reason', ['conversation_access_denied', 'conversation_unavailable', 'security_challenge'])
 async def test_api_recovery_exposes_only_finite_page_error_and_preserves_journal(tmp_path, reason):
     """An unavailable remote page is NOT a reason to retry or repair locally."""
     from httpx import ASGITransport, AsyncClient

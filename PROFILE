@@ -1,3 +1,11 @@
+## v0.4.24 — Browser challenge visibility
+The current managed Chromium profile displayed a Cloudflare human-verification
+challenge; it did not display ChatGPT controls. Do not mistake this for a
+model-picker or page-hydration failure. v0.4.24 passively classifies challenge
+pages; no automated CAPTCHA solving or bypass is supported. Normal manual
+verification may be attempted using `browser open`, with no guarantee that
+ChatGPT will grant access. Existing session journals remain intact.
+
 ## v0.4.23 interface readiness (2026-10-23)
 - Windows v0.4.22 passed 250 tests, but its read-only control scan reported
   `ui_changed` and no model, effort or attachment controls. The scan executed

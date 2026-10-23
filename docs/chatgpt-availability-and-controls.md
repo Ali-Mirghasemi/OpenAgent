@@ -62,3 +62,37 @@ If `page_state` remains `ui_changed`, use the existing
 control-shape diagnostics. A 15- or 30-second wait does not guarantee
 successful login, functionality, complete rendering or a supported model/effort.
 All controls remain detection-only: there are no menu clicks or uploads.
+
+## v0.4.24: Cloudflare human-verification page
+
+A real managed Chromium screenshot showed a Cloudflare **Verify you are human**
+challenge at `chatgpt.com`. The v0.4.23 control scan waited 15 seconds and
+saw `ready_state=complete`, but no `main`, composer, visible buttons or iframe.
+An HTML-ready challenge is **not** a hydrated ChatGPT app.
+
+`chatgpt-controls` and `chatgpt-status` now report `security_challenge` with
+finite evidence (`challenge_title`, `challenge_markup`, or
+`human_verification_prompt`) when a narrowly scoped top-level challenge is
+recognized. The optional feature inventory is marked `unavailable`, not
+`not_detected`, during a known challenge. The Project chat page-error guard
+uses the same passive classification before route-mismatch handling. The
+probe never returns raw HTML, page title, challenge body text, tokens, or
+cookies, and deliberately avoids content from an actual conversation.
+
+To try normal **manual** interaction in the same dedicated browser profile,
+stop the OpenAgent server and run:
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser open --url https://chatgpt.com
+```
+
+The browser remains open for you to interact with the website. If Cloudflare
+allows normal human verification, complete it personally, check whether a
+real ChatGPT composer appears, then press Enter in that terminal to close.
+Rerun the read-only status or controls command afterward. Human verification
+may recur; success is **not** guaranteed by OpenAgent. If verification keeps
+failing, consult the website's support. **Do not** automatically solve the
+challenge, spoof browser fingerprints, rotate identities, or retry prompts.
+
+The known incorrect cached Project answer remains unchanged. The exact
+Project conversation URL and safe reply recovery remain separate work.
