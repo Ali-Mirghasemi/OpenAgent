@@ -1,3 +1,21 @@
+### v0.4.23 — Wait for ChatGPT hydration before control inventory (experimental)
+
+`browser chatgpt-controls` no longer inspects the page immediately after
+`DOMContentLoaded`. It polls for a ready composer or definitive login/challenge
+state, then allows optional controls to finish mounting (up to the same bounded
+wait). The JSON includes `waited_seconds`, `ui_evidence`, `on_expected_domain`,
+and safe `surface` metadata (`ready_state`, main presence, button counts).
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-controls --headful --wait-seconds 15
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-status --headful --wait-seconds 15 --details
+```
+
+`not_detected` is not proof the account lacks a feature: controls may be hidden
+under menus, depend on the account, or use changed selectors. There is no model
+or reasoning-effort selection, file upload, or request submission in this scan.
+The Project reply repair and slugged-conversation continuation risks remain open.
+
 ### v0.4.22 — Chat availability and upcoming page controls (experimental)
 
 When the ChatGPT website displays a top-level "You cannot access this chat",

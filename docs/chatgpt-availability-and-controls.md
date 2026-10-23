@@ -36,3 +36,29 @@ Next work: store and verify exact upstream slugged route; select model/effort
 from verified UI labels with explicit user choice; opt-in attachments with
 strict file validation and success markers; Project resource inventory and
 upload/download lifecycle; OpenCode/9Router API capability negotiation.
+
+## v0.4.23: Wait for hydrated controls
+
+v0.4.22 ran the control inventory immediately after `open_tab` had navigated
+through `DOMContentLoaded`; this was not a readiness wait. ChatGPT is a
+single-page app, and its composer and menu buttons can appear later. Use:
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-controls --headful --wait-seconds 15
+```
+
+The new read-only scanner polls for a visible composer, login marker, challenge,
+or rate-limit state (up to 30 seconds), then polls the optional feature-control
+candidates while they settle. If the composer appears but no optional controls
+are detected, it waits out the remaining budget before reporting their absence.
+Output adds the observed UI evidence, elapsed wait, expected-domain check and
+content-free DOM shape (`ready_state`, body/main presence, counts of visible
+buttons/editable elements). No ChatGPT message, account text, cookie, file path,
+raw HTML, title or private URL is returned. Do **not** confuse
+`document.readyState=complete` with a hydrated, usable chat composer.
+
+If `page_state` remains `ui_changed`, use the existing
+`browser chatgpt-status --details --wait-seconds 15` for additional safe
+control-shape diagnostics. A 15- or 30-second wait does not guarantee
+successful login, functionality, complete rendering or a supported model/effort.
+All controls remain detection-only: there are no menu clicks or uploads.

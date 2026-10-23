@@ -1,3 +1,20 @@
+## v0.4.23 — Bounded control-inventory readiness
+- [x] Windows v0.4.22: 250 tests; `chatgpt-controls --headful` twice returned
+      `ui_changed` and all controls `not_detected` after only `DOMContentLoaded`.
+- [x] Replace single UI snapshot with bounded 0-30-second hydration polling and
+      a post-composer optional-controls settling period.
+- [x] Add `--wait-seconds` for the control scan, and expose safe timing and DOM
+      structure without raw messages, cookies or URLs.
+- [x] Exercise delayed composer/model/upload mounting and permanently missing
+      composer in isolated Chromium fixtures; preserve zero submission.
+- [ ] Verify the live Windows page with `chatgpt-controls --wait-seconds 15` and
+      `chatgpt-status --wait-seconds 15 --details` if controls remain missing.
+- [ ] Persist exact upstream Project-chat route including slug; correct the
+      original `ChatGPT said:` transcript only with an independently verified
+      assistant answer, never resend the original message.
+- [ ] Implement verified model selection, thinking effort and uploads, Project
+      resources, download/export, other page tools and OpenCode/9Router.
+
 ## v0.4.22 — Unavailable-chat detection and read-only feature inventory
 - [x] Windows v0.4.21: 235 passing tests; repair attempts sometimes returned
       `reconcile_route_mismatch` with ChatGPT displaying a chat access error.

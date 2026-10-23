@@ -1,3 +1,17 @@
+## 0.4.23 — 2026-10-23
+- Correct control-inventory readiness: `open_tab` waited only for DOMContentLoaded,
+  which often precedes client-side ChatGPT composer/control hydration.
+- Add bounded 0-30-second waiting (`browser chatgpt-controls --wait-seconds 15`),
+  polling visible ready/login/challenge conditions and then settling optional
+  feature controls. Negative scans are not capability or plan claims.
+- Report `ui_evidence`, `waited_seconds`, expected-domain boolean and safe
+  read-only DOM shape alongside existing feature inventory and no-action flags.
+- Local Chromium integration tests for delayed composer/model/file inputs,
+  timeout on missing composer, and out-of-range wait validation.
+- No automatic retry, upstream conversation navigation changes, model changes,
+  uploaded files or new message submissions. Keep outstanding Project-repair and
+  exact slugged continuation risks explicit.
+
 ## 0.4.22 — 2026-10-23
 - Recognize explicit ChatGPT access-denied and unavailable-chat pages using
   only top-level main-page error headings/alerts, never conversation text.

@@ -331,7 +331,7 @@ async def _chatgpt_controls(args: argparse.Namespace) -> int:
     try:
         config = replace(_browser_settings(args), allowed_origins=("https://chatgpt.com",))
         async with BrowserManager(config) as manager:
-            result = await ChatGPTWebProvider(manager, timeout_s=10).inspect_feature_controls()
+            result = await ChatGPTWebProvider(manager, timeout_s=10).inspect_feature_controls(wait_seconds=args.wait_seconds)
         print(json.dumps(result, indent=2))
         return 0
     except (BrowserError, ValueError, OSError) as exc:
@@ -566,6 +566,8 @@ def main() -> None:
     chatgpt_status.add_argument("--screenshot", type=Path, help="OPTIONAL local PNG: may contain private chat/account details; never shared automatically")
 
     controls_check = browser_sub.add_parser("chatgpt-controls", help="read-only inventory of model, effort, upload, and other UI controls")
+    controls_check.add_argument("--wait-seconds", type=float, default=12.0,
+                                help="wait 0-30 seconds for ChatGPT SPA hydration and optional controls (default 12)")
     compose_check = browser_sub.add_parser("chatgpt-compose-check", help="type a harmless draft and inspect Send WITHOUT submitting")
     projects_cmd = browser_sub.add_parser("chatgpt-projects", help="list visible ChatGPT project links/rows without clicking or submitting")
     projects_cmd.add_argument("--json", action="store_true", help="output visible project names and derived candidate URLs as JSON")

@@ -1,3 +1,18 @@
+## v0.4.23 interface readiness (2026-10-23)
+- Windows v0.4.22 passed 250 tests, but its read-only control scan reported
+  `ui_changed` and no model, effort or attachment controls. The scan executed
+  immediately after `DOMContentLoaded`; SPA hydration was not waited for.
+- `chatgpt-controls` now accepts `--wait-seconds 0..30` (default 12). It waits
+  for a visual chat-ready state (or a definitive login/challenge/error state),
+  and allows optional controls additional time to mount/settle. If no optional
+  controls appear, it uses the remaining budget rather than deciding early.
+- JSON exposes only UI state/evidence, elapsed seconds, expected-domain boolean,
+  and content-free DOM-shape metadata. No selection, upload or Send action.
+- Delayed Chromium fixture tests added; Windows real ChatGPT result still needed.
+- The Project answer repair remains blocked and existing exact-route/slug
+  reconstruction remains a continuation hazard. No live message should be
+  replayed to recover it.
+
 ## v0.4.22 engineering status
 - v0.4.21 Windows: 235 passed; Project repair still blocked, with intermittent
   live ChatGPT unavailable-chat screens and generic route-mismatch diagnostics.

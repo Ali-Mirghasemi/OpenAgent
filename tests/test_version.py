@@ -6,7 +6,7 @@ from openagent.store import SessionStore
 
 
 def test_package_version():
-    assert __version__ == "0.4.22"
+    assert __version__ == "0.4.23"
 
 
 def test_health_version(tmp_path):

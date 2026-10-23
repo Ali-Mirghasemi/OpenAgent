@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from typing import Any
 
 from ..browser.diagnostics import UIObservation, UISelectors, inspect_ui
+from ..browser.surface import observe_status, inspect_surface
 from ..browser.manager import BrowserManager, BrowserNavigationError, _origin
 from ..capabilities import Capabilities, Feature
 from ..models import Message, ProviderOutput
@@ -367,17 +368,50 @@ class ChatGPTWebProvider(BrowserUIProvider):
                 return
             await asyncio.sleep(min(0.1, deadline - time.monotonic()))
 
-    async def inspect_feature_controls(self) -> dict[str, Any]:
-        """Read-only inventory; never opens model/effort pickers or file dialogs."""
+    async def inspect_feature_controls(self, *, wait_seconds: float = 12.0) -> dict[str, Any]:
+        """Wait for SPA hydration, then inventory optional controls without clicking.
+
+        ``DOMContentLoaded`` is not enough for the React UI. The wait is bounded
+        to 30 seconds, respects visible login/challenge states, and never treats
+        an absent model/effort control as proof a feature is unsupported.
+        """
+        if not 0 <= wait_seconds <= 30:
+            raise ValueError("feature inventory wait interval must be 0-30 seconds")
         async with self._turn_lock:
             await self.browser.start()
             tab_id = "feature-scan-" + uuid.uuid4().hex
             page = None
             try:
                 page = await self.browser.open_tab(tab_id, self.site.url)
-                observed = await inspect_ui(page, self.site.selectors)
+                started = time.monotonic()
+                observed, _status_controls, _elapsed = await observe_status(
+                    page, self.site.selectors, wait_seconds=wait_seconds,
+                )
+                controls = await chatgpt_feature_inventory(page)
+                # Optional controls may mount after the composer. A stable
+                # READY state alone cannot establish their absence. If no
+                # optional control has appeared, use the remaining budget;
+                # otherwise wait for a settled snapshot (with a short grace).
+                if observed.state == "ready":
+                    earliest = time.monotonic() + min(1.0, max(0.0, wait_seconds - (time.monotonic() - started)))
+                    last_change = time.monotonic()
+                    while time.monotonic() - started < wait_seconds:
+                        await asyncio.sleep(min(0.25, max(0.0, wait_seconds - (time.monotonic() - started))))
+                        new_controls = await chatgpt_feature_inventory(page)
+                        if new_controls != controls:
+                            controls = new_controls
+                            last_change = time.monotonic()
+                        if (any(v == "detected" for v in controls.values()) and
+                                time.monotonic() >= earliest and
+                                time.monotonic() - last_change >= 0.75):
+                            break
+                on_chatgpt_domain = urlsplit(page.url).hostname == urlsplit(self.site.url).hostname
                 return {"page_state": observed.state,
-                        "controls": await chatgpt_feature_inventory(page),
+                        "ui_evidence": observed.evidence,
+                        "waited_seconds": round(time.monotonic() - started, 2),
+                        "on_expected_domain": on_chatgpt_domain,
+                        "surface": await inspect_surface(page),
+                        "controls": controls,
                         "selection_changed": False, "uploaded": False,
                         "submitted": False}
             finally:
