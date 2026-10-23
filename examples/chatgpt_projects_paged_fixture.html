@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Local scrolling Projects fixture</title></head>
+<body>
+  <aside aria-label="Application navigation" style="height:170px;overflow-y:auto;border:1px solid #888">
+    <h2>Projects</h2>
+    <div id="project-list"></div>
+    <button id="project-more" type="button" aria-label="Show more projects">Show more projects</button>
+    <button id="unrelated-more" type="button">Show more</button>
+    <div style="height:200px" aria-hidden="true"></div>
+  </aside>
+  <button id="outside-more" type="button">Show more projects</button>
+  <button id="send-trap" type="button">Send</button>
+  <script>
+    window.projectMoreClicks = 0;
+    window.outsideMoreClicks = 0;
+    window.unrelatedMoreClicks = 0;
+    window.sendClicks = 0;
+    window.scrolled = 0;
+    const list = document.querySelector('#project-list');
+    function add(index) {
+      const el = document.createElement('div');
+      el.setAttribute('role', 'button');
+      el.setAttribute('aria-expanded', 'false');
+      el.style.height = '32px';
+      const id = index.toString(16).padStart(32,'0');
+      el.innerHTML = '<span data-sidebar-project-container-id="project:g-p-' + id + '">' +
+        '<span data-marquee-text="true">Project ' + index + '</span></span>';
+      list.append(el);
+    }
+    for(let i=1;i<=5;i++) add(i);
+    document.querySelector('#project-more').onclick = function() {
+      window.projectMoreClicks++;
+      for(let i=6;i<=8;i++) add(i);
+      this.remove();
+    };
+    document.querySelector('#outside-more').onclick = () => window.outsideMoreClicks++;
+    document.querySelector('#unrelated-more').onclick = () => window.unrelatedMoreClicks++;
+    document.querySelector('#send-trap').onclick = () => window.sendClicks++;
+    document.querySelector('aside').onscroll = function() {
+      if (this.scrollTop > 100 && window.scrolled === 0) {
+        window.scrolled++;
+        // Virtualized rows: replace DOM nodes with *new* Projects.
+        list.innerHTML = '';
+        for(let i=9;i<=12;i++) add(i);
+      }
+    };
+  </script>
+</body></html>

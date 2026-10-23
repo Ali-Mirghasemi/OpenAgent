@@ -1,3 +1,15 @@
+## v0.4.12 — Project inventory beyond initially mounted rows
+- [x] Verify v0.4.11 on Windows (165 tests, five visible Project rows).
+- [x] Add explicit `--load-all` with bounded sidebar scrolling and specific
+      Projects-list expansion controls; ordinary discovery remains passive.
+- [x] Aggregate project identities as sidebar virtualizes or lazily mounts rows.
+- [x] Wait for a briefly stable set, not merely the first visible Project.
+- [x] Report `complete: false` because visible UI inventory is not an API-wide count.
+- [ ] Verify `--load-all` on Windows; determine if additional Projects require
+      a different workspace view/search/picker (do not invent their IDs).
+- [ ] Implement verified Project selection and project-specific chat bindings.
+- [ ] Model and effort selection, attachments, file handling, client integration.
+
 ## v0.4.11 — 2026 Project row discovery
 - [x] Confirm v0.4.10 on Windows (161 tests, draft-only Send detected).
 - [x] Discover visible linkless Project rows with validated DOM project markers.

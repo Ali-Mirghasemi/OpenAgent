@@ -1,3 +1,27 @@
+# OpenAgent Bridge v0.4.12 — More complete Projects UI inventory
+
+Windows v0.4.11 passed **165 tests** and found five Projects in the visible
+ChatGPT sidebar, but the user reports additional Projects. The basic command
+still reads only currently rendered rows. **New opt-in `--load-all`** performs
+bounded scrolling and uses only unmistakable Projects-list expansion controls
+in the sidebar. It accumulates Project IDs even if the UI virtualizes older rows.
+
+```powershell
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-projects --headful --load-all --wait-seconds 12
+.\.venv\Scripts\python.exe -m openagent.cli browser chatgpt-projects --headful --load-all --max-steps 30 --json
+```
+
+The JSON report deliberately returns `complete: false`: these UI actions
+**cannot prove an account-wide total**, and an unmounted Projects picker,
+search results, other workspace, or collapsed section may hold more Projects.
+No chat or Project is selected, no prompts are sent, and no internal API calls
+are made. `--load-all` *does* scroll the sidebar and click specifically labeled
+Projects-list expansion buttons; omit it for a fully passive inspection.
+
+See [Projects pagination and limits](docs/chatgpt-projects-pagination.md).
+
+---
+
 # OpenAgent Bridge v0.4.11 — Project sidebar row discovery
 
 Windows v0.4.10 was validated with **161 passing tests** and

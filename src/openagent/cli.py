@@ -343,23 +343,37 @@ async def _chatgpt_projects(args: argparse.Namespace) -> int:
     """Find visible project links and expandable project rows without clicking."""
     from .browser import BrowserManager, BrowserError
     from .providers.chatgpt_web import CHATGPT_URL
-    from .providers.chatgpt_projects import wait_for_chatgpt_projects
+    from .providers.chatgpt_projects import wait_for_chatgpt_projects, scan_chatgpt_projects
     try:
         config = replace(_browser_settings(args), allowed_origins=("https://chatgpt.com",))
         async with BrowserManager(config) as manager:
             page = await manager.open_tab("chatgpt-project-inventory", CHATGPT_URL)
             try:
-                projects = await wait_for_chatgpt_projects(page, wait_seconds=args.wait_seconds)
+                if args.load_all:
+                    report = await scan_chatgpt_projects(
+                        page, wait_seconds=args.wait_seconds, max_steps=args.max_steps,
+                    )
+                    projects = report.projects
+                else:
+                    projects = await wait_for_chatgpt_projects(page, wait_seconds=args.wait_seconds)
             finally:
                 await manager.close_tab("chatgpt-project-inventory")
         if args.json:
-            print(json.dumps([project.as_dict() for project in projects], indent=2))
+            if args.load_all:
+                print(json.dumps(report.as_dict(), indent=2))
+            else:
+                print(json.dumps([project.as_dict() for project in projects], indent=2))
         else:
             for project in projects:
                 print(f"{project.name} [{project.id}]")
                 print(f"  {project.url}")
-            print(f"Visible ChatGPT projects: {len(projects)}")
-            print("Only visible sidebar links/rows are reported; this does not select a project.")
+            print(f"Discovered ChatGPT projects: {len(projects)}")
+            if args.load_all:
+                print(f"UI scan: {report.scroll_steps} scrolls, {report.expand_clicks} explicit expansions")
+                print("Best-effort inventory only; completeness is NOT verified.")
+            else:
+                print("Only currently rendered sidebar links/rows are reported; use --load-all to scan more.")
+            print("No Project is selected or opened.")
             if not projects:
                 print("The Projects section may be collapsed, hidden, or not mounted in this layout.")
         return 0
@@ -494,6 +508,10 @@ def main() -> None:
     projects_cmd.add_argument("--json", action="store_true", help="output visible project names and derived candidate URLs as JSON")
     projects_cmd.add_argument("--wait-seconds", type=float, default=5.0,
                               help="wait 0-30 seconds for sidebar rows to render (default 5)")
+    projects_cmd.add_argument("--load-all", action="store_true",
+                              help="opt-in bounded scrolling and explicitly labeled Projects-list expansion; best effort")
+    projects_cmd.add_argument("--max-steps", type=int, default=15,
+                              help="max 1-60 UI expansion/scroll steps with --load-all (default 15)")
 
     fixture = browser_sub.add_parser("ui-test", help="submit one turn ONLY to a locally hosted UI fixture")
     fixture.add_argument("--url", default="http://127.0.0.1:8999/chat_fixture.html")

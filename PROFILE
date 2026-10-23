@@ -1,3 +1,12 @@
+## v0.4.12 best-effort Projects scan
+- Default inventory is non-interacting; opt-in `--load-all` may scroll a
+  strictly scoped sidebar and click only positively named Project-list expansion
+  UI controls, never unrelated More buttons, conversations, Send, or files.
+- Collect across virtualization without depending on number of currently
+  mounted rows; never mistake five visible projects for full account inventory.
+- Expose a machine-readable `complete: false` until an authoritative result is
+  available. Page URLs are derived *candidates*, not verified Project routes.
+
 ## v0.4.11 read-only Project discovery
 - A Project can appear as a sidebar row with a stable public DOM ID but no
   anchor. Read the marker only from visible expandable Project rows.

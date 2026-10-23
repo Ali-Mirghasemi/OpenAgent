@@ -1,3 +1,14 @@
+## 0.4.12 — 2026-10-23
+- User confirmed v0.4.11 on Windows: 165 tests, 5 discovered sidebar Projects,
+  with additional Projects known to exist.
+- Add `browser chatgpt-projects --load-all` to scan bounded lazy/virtualized
+  navigation lists, gathering IDs across scroll and explicit Projects-list
+  expansion steps. Default read-only command remains unchanged.
+- Stabilize hydration sampling; first mounted row is no longer the end signal.
+- JSON scan report contains `complete: false` and counts for scroll/click work.
+- Tests use synthetic Chromium Projects lists, virtualization, delayed rows,
+  unrelated click traps, and limits. No real ChatGPT automation performed.
+
 ## 0.4.11 — 2026-10-23
 - Windows v0.4.10 passed 161 tests; draft-only `send_ready` but no visible
   Project links were found in the authenticated browser.
