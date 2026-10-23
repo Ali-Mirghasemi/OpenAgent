@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .models import Message, ProviderOutput
+from .models import Message, ProviderOutput, valid_upstream_id
 
 
 class SessionNotFound(KeyError):
@@ -39,7 +39,8 @@ class SessionStore:
                 model TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                messages TEXT NOT NULL
+                messages TEXT NOT NULL,
+                upstream_conversation_id TEXT
             );
             CREATE TABLE IF NOT EXISTS turns (
                 session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -50,11 +51,15 @@ class SessionStore:
                 PRIMARY KEY (session_id, request_id)
             );
         """)
+        # Backward-compatible migration for existing v0.4.7 databases.
+        fields = {row["name"] for row in self.db.execute("PRAGMA table_info(sessions)")}
+        if "upstream_conversation_id" not in fields:
+            self.db.execute("ALTER TABLE sessions ADD COLUMN upstream_conversation_id TEXT")
 
     def create(self, model: str) -> dict[str, Any]:
         sid, now = uuid.uuid4().hex, utcnow()
         self.db.execute(
-            "INSERT INTO sessions VALUES (?,?,?,?,?)",
+            "INSERT INTO sessions(id,model,created_at,updated_at,messages) VALUES (?,?,?,?,?)",
             (sid, model, now, now, "[]"),
         )
         return self.get(sid)
@@ -67,7 +72,21 @@ class SessionStore:
             "id": row["id"], "model": row["model"],
             "created_at": row["created_at"], "updated_at": row["updated_at"],
             "messages": json.loads(row["messages"]),
+            "upstream": (
+                {"conversation_id": row["upstream_conversation_id"], "source": "provider_reported"}
+                if row["upstream_conversation_id"] else None
+            ),
         }
+
+    def list_turns(self, session_id: str) -> list[dict[str, Any]]:
+        """Read-only outcome ledger; never automatically replays unknown work."""
+        self.get(session_id)  # enforce session existence
+        rows = self.db.execute(
+            "SELECT request_id,status,response FROM turns WHERE session_id=? ORDER BY rowid",
+            (session_id,),
+        ).fetchall()
+        return [{"request_id": row["request_id"], "status": row["status"],
+                 "has_response": row["response"] is not None} for row in rows]
 
     def claim_turn(self, session_id: str, request_id: str, message: Message) -> dict[str, Any] | None:
         """Return a cached completed response or reserve new work exactly once.
@@ -102,20 +121,35 @@ class SessionStore:
             )
         return None
 
-    def complete_turn(self, session_id: str, request_id: str, user: Message, output: ProviderOutput) -> dict[str, Any]:
+    def complete_turn(self, session_id: str, request_id: str, user: Message, output: ProviderOutput,
+                      *, supports_upstream_conversations: bool = False) -> dict[str, Any]:
         """Atomically commit both transcript messages and a replayable reply."""
         payload = output.model_dump(mode="json")
         with self.db:
             self.db.execute("BEGIN IMMEDIATE")
-            row = self.db.execute("SELECT messages FROM sessions WHERE id=?", (session_id,)).fetchone()
+            row = self.db.execute(
+                "SELECT messages,upstream_conversation_id FROM sessions WHERE id=?", (session_id,)
+            ).fetchone()
             if row is None:
                 raise SessionNotFound(session_id)
+            turn = self.db.execute(
+                "SELECT status FROM turns WHERE session_id=? AND request_id=?", (session_id, request_id)
+            ).fetchone()
+            if turn is None or turn["status"] != "pending":
+                raise SessionBusy("turn is not pending; refusing to append transcript")
+            previous = row["upstream_conversation_id"]
+            reported = output.upstream_conversation_id
+            if reported is not None:
+                if not supports_upstream_conversations or not valid_upstream_id(reported):
+                    raise SessionBusy("provider is not permitted to bind an upstream conversation")
+                if previous is not None and previous != reported:
+                    raise SessionBusy("upstream conversation changed unexpectedly; manual reconciliation required")
             entries = json.loads(row["messages"])
             entries.append(user.model_dump(mode="json", exclude_none=True))
             entries.append(Message(role="assistant", content=output.content, tool_calls=output.tool_calls).model_dump(mode="json", exclude_none=True))
             self.db.execute(
-                "UPDATE sessions SET messages=?,updated_at=? WHERE id=?",
-                (json.dumps(entries), utcnow(), session_id),
+                "UPDATE sessions SET messages=?,updated_at=?,upstream_conversation_id=COALESCE(upstream_conversation_id, ?) WHERE id=?",
+                (json.dumps(entries), utcnow(), reported, session_id),
             )
             self.db.execute(
                 "UPDATE turns SET status='done',response=? WHERE session_id=? AND request_id=? AND status='pending'",

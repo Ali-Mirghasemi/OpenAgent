@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal
+import re
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -31,10 +32,26 @@ class CompletionRequest(BaseModel):
     temperature: float | None = None
 
 
+# Provider-issued identity only; never trust a model-generated chat ID in prose.
+# This field is used by /openagent/sessions, not returned in OpenAI completion messages.
+UPSTREAM_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+
+
+def valid_upstream_id(value: str) -> bool:
+    return bool(UPSTREAM_ID_RE.fullmatch(value))
+
+
 class ProviderOutput(BaseModel):
+    upstream_conversation_id: str | None = None
     content: str | None = None
     tool_calls: list[dict[str, Any]] | None = None
     finish_reason: Literal["stop", "tool_calls", "length"] = "stop"
+
+    @model_validator(mode="after")
+    def validate_upstream_identity(self) -> "ProviderOutput":
+        if self.upstream_conversation_id is not None and not valid_upstream_id(self.upstream_conversation_id):
+            raise ValueError("invalid provider-issued upstream conversation identifier")
+        return self
 
 
 class SessionCreate(BaseModel):

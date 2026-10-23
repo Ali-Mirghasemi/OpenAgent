@@ -1,6 +1,7 @@
 """HTTP bridge (OpenAI-compatible subset + native session endpoints)."""
 from __future__ import annotations
 
+import asyncio
 import json
 from contextlib import asynccontextmanager
 import secrets
@@ -146,11 +147,22 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
         except SessionNotFound:
             raise HTTPException(404, "unknown session")
 
+    @app.get("/openagent/sessions/{session_id}/turns")
+    async def get_session_turns(session_id: str):
+        try:
+            return {"session_id": session_id, "turns": store.list_turns(session_id)}
+        except SessionNotFound:
+            raise HTTPException(404, "unknown session")
+
     @app.post("/openagent/sessions/{session_id}/turns")
     async def run_turn(session_id: str, body: SessionTurn):
         try:
             session = store.get(session_id)
             provider = await registry.resolve(session["model"])
+            # A bound upstream conversation must be continued by an adapter
+            # that explicitly supports it, never silently restarted.
+            if session["upstream"] and not provider.supports_upstream_conversations:
+                return error_response("upstream continuation unsupported", 422)
             cached = store.claim_turn(session_id, body.request_id, body.message)
         except SessionNotFound:
             raise HTTPException(404, "unknown session")
@@ -159,10 +171,22 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
         if cached is not None:
             return {"cached": True, "output": cached, "session_id": session_id}
         try:
+            # Re-read after acquiring the claim. Another request can finish
+            # between the initial GET and the claim, updating the transcript.
+            session = store.get(session_id)
             messages = [Message.model_validate(m) for m in session["messages"]] + [body.message]
-            output = await provider.complete(session["model"], messages)
-            stored = store.complete_turn(session_id, body.request_id, body.message, output)
+            upstream_id = session["upstream"]["conversation_id"] if session["upstream"] else None
+            output = await provider.complete_in_session(
+                session["model"], messages, upstream_conversation_id=upstream_id,
+            )
+            stored = store.complete_turn(
+                session_id, body.request_id, body.message, output,
+                supports_upstream_conversations=provider.supports_upstream_conversations,
+            )
             return {"cached": False, "output": stored, "session_id": session_id}
+        except asyncio.CancelledError:
+            store.fail_turn(session_id, body.request_id)
+            raise
         except Exception:
             store.fail_turn(session_id, body.request_id)
             return error_response("turn failed; request will not be automatically retried", 502, "provider_error")

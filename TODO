@@ -1,3 +1,16 @@
+## v0.4.8 — Local/upstream conversation continuity foundation
+- [x] Store optional provider-reported upstream IDs beside local session state.
+- [x] Preserve v0.4.7 databases through an additive SQLite migration.
+- [x] Expose request outcome status in a read-only ledger endpoint.
+- [x] Provide opt-in provider continuation hook with fail-closed defaults.
+- [x] Block mismatched upstream IDs, duplicate submissions, and silent thread replacement.
+- [x] Preserve uncertainty on cancellation and after provider failures.
+- [x] Test restart, replay, schema migration, and ambiguous continuation offline.
+- [ ] Discover real upstream conversation IDs through a supported provider interface.
+- [ ] Verify provider-native resumption before enabling persistent chat capability.
+- [ ] Design operator-assisted reconciliation for unknown outcomes (no auto-retry).
+- [ ] Perform client interoperability tests with OpenCode and 9Router.
+
 ## v0.4.7 — Turn-scoped DOM identity
 - [x] Detect a new assistant answer despite unchanged mounted DOM message count,
       when a stable logical turn ID is available.

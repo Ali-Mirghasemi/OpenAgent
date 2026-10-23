@@ -1,3 +1,19 @@
+## 0.4.8 — 2026-10-20
+- User verified v0.4.7 installation on Windows, 114 tests passed, and signed-in
+  browser UI readiness still returns `ready` without an active Send button.
+- Added optional provider-issued upstream conversation IDs in SQLite sessions,
+  with a backward-compatible v0.4.7 database migration.
+- Added an explicit `complete_in_session` provider hook. Bound sessions can
+  continue only through adapters that opt in to upstream continuation; existing
+  one-shot adapters cannot silently create replacement conversations.
+- Reject invalid or unexpectedly changed upstream IDs without committing
+  the local transcript. Uncertain responses block further turns.
+- Added read-only `GET /openagent/sessions/{id}/turns` outcome ledger, and
+  re-read the transcript after claiming a turn to avoid stale snapshots.
+- Mark provider cancellation as an uncertain outcome in the local journal.
+- Added offline migration, restart/continuation, idempotency and conflict tests.
+- No live ChatGPT ID discovery or upstream conversation resume is implemented.
+
 ## 0.4.7 — 2026-10-20
 - User confirmed OpenAgent v0.4.6 on Windows: 106 tests passed and authenticated
   ChatGPT page reports `ready` with an inactive Send button (read-only).

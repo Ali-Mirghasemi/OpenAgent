@@ -1,6 +1,6 @@
 # OpenAgent Bridge — Architecture Decision Record 001
 
-**Status:** Iterating. Current implementation: v0.2.0.
+**Status:** Iterating. Current implementation: v0.4.8.
 
 ## Goal
 
@@ -76,3 +76,13 @@ returning. The bridge still refuses unsupported streaming and native tools.
 `--enable-chatgpt-web` requires `OPENAGENT_API_TOKEN` even on loopback.
 Public website permissions and account verification are separate from transport
 capability; no live third-party service was exercised by the release tests.
+
+## v0.4.8 — Conversation identity and replay control
+
+Local SQLite sessions now optionally store a provider-reported, opaque upstream
+conversation ID. Only explicit provider opt-in enables remote continuation;
+all other providers keep local history only. Each pending turn reserves a
+request ID, successful completion atomically updates the transcript and
+optional upstream ID, and ambiguous outcomes block resubmission. The
+read-only turn ledger helps troubleshoot those blocked sessions. See
+[session continuation](session-continuation.md).

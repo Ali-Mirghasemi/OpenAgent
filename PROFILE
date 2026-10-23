@@ -1,3 +1,12 @@
+## v0.4.8 session identity contract
+- Local session IDs are OpenAgent-generated and remain separate from provider
+  conversation IDs. Never infer the latter from a DOM count or request text.
+- Only a provider that implements and explicitly enables upstream continuation
+  may report a conversation ID, stored atomically alongside a successful turn.
+- Do not resubmit pending/unknown requests; use the read-only turn ledger.
+- Bound sessions must fail closed if the provider cannot safely continue them.
+- ChatGPT browser preview remains one-shot with upstream continuation unsupported.
+
 # OpenAgent — Project Profile
 
 ## Identity

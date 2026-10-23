@@ -1,3 +1,31 @@
+# OpenAgent Bridge v0.4.8 — Session continuation foundation
+
+This update adds **durable upstream conversation identity** as an optional,
+provider-issued field on the existing SQLite local session. Only providers
+which explicitly implement conversation continuation can bind or resume that
+identity. A previously bound session cannot silently fall back to a new chat.
+
+The new read-only endpoint `GET /openagent/sessions/{id}/turns` displays the
+outcome ledger. Pending/unknown requests remain blocked rather than retried.
+Existing v0.4.7 SQLite databases migrate in place, preserving messages and
+request IDs. The feature is covered by offline fixture-provider tests.
+
+**ChatGPT-specific resume is not implemented or verified.** The existing
+browser UI adapter remains one-shot and account-backed use is still
+experimental. No real chat messages were sent as part of this release.
+
+On Windows, apply the v0.4.7 → v0.4.8 patch, install and run tests:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,browser]"
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+See [Session continuation design](docs/session-continuation.md) for a mock-only
+PowerShell API test, persistence guarantees, and known limitations.
+
+---
+
 ## v0.4.7: DOM turn-identity reliability
 
 This update improves ChatGPT-shaped browser fixture handling when a site
