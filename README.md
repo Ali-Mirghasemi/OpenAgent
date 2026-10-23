@@ -665,3 +665,27 @@ The bridge's experimental ChatGPT provider will refuse to click Send unless an
 enabled and visible Send control appears *after* text entry. No message is
 submitted by `chatgpt-status`, and `submit_unavailable` means nothing was sent.
 The provider's live UI compatibility and service permissions remain unverified.
+
+### Project-native session messages (v0.4.16 — experimental)
+
+The existing Project binding API remains read-only and persistent. New,
+separately gated Project-scoped turns require **all** three flags:
+
+```powershell
+$env:OPENAGENT_API_TOKEN = "replace-with-strong-random-token"
+.\.venv\Scripts\python.exe -m openagent.cli serve --enable-chatgpt-web --enable-chatgpt-conversations --enable-chatgpt-project-messages --headful
+```
+
+After creating an empty `chatgpt-web/default` session and binding a Project
+using `POST /openagent/sessions/{id}/project`, session turns use the already
+existing `POST /openagent/sessions/{id}/turns` endpoint. The first turn must
+begin on a freshly verified Project Home. Subsequent turns require the exact
+same `/g/<project-id>/c/<uuid>` upstream conversation and visible prior history.
+Any ambiguous completion is recorded as `unknown` and **must not be replayed**.
+Without `--enable-chatgpt-project-messages`, Project-bound session turns stay
+blocked with HTTP 422. The ordinary completions endpoint remains Project-free.
+
+This protocol is tested with local browser fixtures, **not** validated against
+a live ChatGPT account. UI selectors/routes can change and website automation
+must be used only when the provider permits it. See
+[docs/project-native-routing.md](docs/project-native-routing.md).

@@ -1,3 +1,16 @@
+## v0.4.16 experimental Project-native routing (2026-10-23)
+- Windows v0.4.15: all 191 tests passed; Project binding persisted with `ui_verified`.
+- Project-scoped session turns have a separate provider interface and require
+  `--enable-chatgpt-project-messages` AND the existing browser/continuation opt-ins.
+- Initial turn: verify exact Project ID route AND main heading in the owned tab
+  before any input; submit only latest user text. Follow-ups must revisit the
+  exact `/g/<project>/c/<uuid>` route with visible prior assistant history.
+- Post-submit require canonical same-Project URL and completed assistant turn;
+  unresolved outcomes remain in the journal as unknown and cannot auto-retry.
+- Atomic claim enforces exact Project ID, preserving ordinary unbound chats.
+- All tests use synthetic DOM/fixture providers; live site not validated, and
+  the provider's automation policies must be respected.
+
 ## v0.4.15 Project session binding boundary (2026-10-23)
 - On Windows, v0.4.14 passed 185 tests and Project Home verification succeeded
   for the selected OpenAgent Project (route + main heading).

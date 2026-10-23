@@ -196,15 +196,22 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
         try:
             session = store.get(session_id)
             provider = await registry.resolve(session["model"])
-            # Project-scoped message routing is NOT implemented. Never send a
-            # bound session into the ordinary ChatGPT homepage by accident.
-            if session["project"] is not None:
-                return error_response("Project-scoped messaging not implemented; no request submitted", 422)
+            # A separate operator flag is required for any Project submission.
+            # Never route a bound session through the ordinary provider path.
+            project = session["project"]
+            if project is not None and not (
+                getattr(provider, "supports_project_messages", False)
+                and provider.supports_upstream_conversations
+            ):
+                return error_response("Project-scoped messaging not implemented or enabled; no request submitted", 422)
             # A bound upstream conversation must be continued by an adapter
             # that explicitly supports it, never silently restarted.
             if session["upstream"] and not provider.supports_upstream_conversations:
                 return error_response("upstream continuation unsupported", 422)
-            cached = store.claim_turn(session_id, body.request_id, body.message)
+            cached = store.claim_turn(
+                session_id, body.request_id, body.message,
+                expected_project_id=project["id"] if project else None,
+            )
         except SessionNotFound:
             raise HTTPException(404, "unknown session")
         except SessionBusy as exc:
@@ -217,9 +224,16 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
             session = store.get(session_id)
             messages = [Message.model_validate(m) for m in session["messages"]] + [body.message]
             upstream_id = session["upstream"]["conversation_id"] if session["upstream"] else None
-            output = await provider.complete_in_session(
-                session["model"], messages, upstream_conversation_id=upstream_id,
-            )
+            # Use the transactionally claimed, server-verified project binding.
+            if project is not None:
+                output = await provider.complete_in_project_session(
+                    session["model"], messages, project_id=project["id"],
+                    project_name=project["name"], upstream_conversation_id=upstream_id,
+                )
+            else:
+                output = await provider.complete_in_session(
+                    session["model"], messages, upstream_conversation_id=upstream_id,
+                )
             stored = store.complete_turn(
                 session_id, body.request_id, body.message, output,
                 supports_upstream_conversations=provider.supports_upstream_conversations,

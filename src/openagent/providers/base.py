@@ -11,6 +11,7 @@ class Provider(ABC):
     # An adapter must explicitly opt in only after its upstream continuation
     # logic has been implemented and verified. Default is local history only.
     supports_upstream_conversations: bool = False
+    supports_project_messages: bool = False
 
     @abstractmethod
     async def models(self) -> list[str]:
@@ -44,3 +45,10 @@ class Provider(ABC):
         if upstream_conversation_id is not None:
             raise RuntimeError("upstream continuation is not implemented for this provider")
         return await self.complete(model, messages)
+
+    async def complete_in_project_session(
+        self, model: str, messages: list[Message], *, project_id: str,
+        project_name: str, upstream_conversation_id: str | None,
+    ) -> ProviderOutput:
+        """No implicit fallback to non-project conversation transport."""
+        raise RuntimeError("Project-scoped messages are not implemented for this provider")

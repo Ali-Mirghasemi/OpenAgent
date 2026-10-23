@@ -1,3 +1,15 @@
+## v0.4.16 — Opt-in Project-scoped session turns
+- [x] Windows verified v0.4.15: 191 tests, Project ID/name persisted.
+- [x] Add explicit provider Project-turn path and independent CLI enable flag.
+- [x] Project Home route + visible main heading required for new first turn.
+- [x] Follow-up uses only newest user text in the same Project-scoped chat URL.
+- [x] Exact Project/UUID validation after completion, atomic request claim,
+      manual reconciliation on uncertain outcome (no automatic resend).
+- [x] Local fake-provider/API/restart tests and Chromium DOM fixtures.
+- [ ] Test Project-native submission/continuation live where permitted.
+- [ ] Model/reasoning controls, Project files, uploads/downloads, OpenCode/9Router,
+      prompt/native tools and other providers remain planned.
+
 ## v0.4.15 — Verified Project association (no Project chat submission)
 - [x] Windows v0.4.14 validated: 185 tests and selected Project Home verified.
 - [x] Add authenticated API for explicitly binding a Project to an empty session

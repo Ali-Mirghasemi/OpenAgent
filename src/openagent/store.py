@@ -136,7 +136,8 @@ class SessionStore:
         return [{"request_id": row["request_id"], "status": row["status"],
                  "has_response": row["response"] is not None} for row in rows]
 
-    def claim_turn(self, session_id: str, request_id: str, message: Message) -> dict[str, Any] | None:
+    def claim_turn(self, session_id: str, request_id: str, message: Message, *,
+                   expected_project_id: str | None = None) -> dict[str, Any] | None:
         """Return a cached completed response or reserve new work exactly once.
 
         Pending and unknown-outcome turns are NOT retried automatically: a transport can
@@ -150,11 +151,10 @@ class SessionStore:
             ).fetchone()
             if not session_row:
                 raise SessionNotFound(session_id)
-            # Race guard: the HTTP route may have read an unbound session just
-            # before a concurrent request binds it. Do not let a normal turn
-            # bypass the project gate between its GET and transactional claim.
-            if session_row["project_id"] is not None:
-                raise SessionBusy("Project-bound session cannot use ordinary turn submission")
+            # Atomic route guard against API/UI races: a normal request must
+            # remain unbound; a Project request must match the exact binding.
+            if session_row["project_id"] != expected_project_id:
+                raise SessionBusy("session Project binding changed or ordinary turn was attempted")
             row = self.db.execute(
                 "SELECT status,response,payload_hash FROM turns WHERE session_id=? AND request_id=?",
                 (session_id, request_id),
