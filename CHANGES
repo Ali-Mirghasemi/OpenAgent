@@ -1,3 +1,18 @@
+## 0.4.18 — 2026-10-23
+- User verified v0.4.17 on Windows (215 tests). Recovery of the successfully
+  answered Project request still returned HTTP 409 and left the journal unknown.
+- Add an explicitly read-only `/reconcile-check` endpoint with finite, sanitized
+  reason codes, no message text, no journal writes and no Send interaction.
+- Reconciliation now differentiates route, page, user/assistant identity,
+  chronological order, completion marker and stability failures instead of one
+  uninformative 409. The existing `/reconcile` keeps its fail-closed semantics.
+- Recognize assistant-scoped Copy actions that are mounted in the DOM but
+  temporarily hidden by hover/responsive CSS; require the exact last user turn,
+  later assistant, nonempty stable answer and no busy state as before.
+- Test using fake providers/API and real Chromium DOM fixtures, including
+  hidden actions and wrong chronological order. Live recovery remains unverified.
+- Never automatically replay an unknown turn or expose browser/cookie secrets.
+
 ## 0.4.17 — 2026-10-23
 - Windows v0.4.16 verified: 207 tests passed and the first real Project-scoped
   prompt was submitted and answered correctly on ChatGPT. The local session

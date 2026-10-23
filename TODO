@@ -1,3 +1,16 @@
+## v0.4.18 — Project recovery diagnostics
+- [x] Windows v0.4.17 validated: 215 tests, original `unknown` turn remained
+      unmodified after a 409 on read-only recovery.
+- [x] Expose separate read-only `reconcile-check` with sanitized reason codes.
+- [x] Recognize turn-scoped Copy actions mounted but hidden by the UI.
+- [x] Preserve exact last user and following assistant, stable text, no busy
+      markers, and immutable unknown-turn journal until verified recovery.
+- [ ] Diagnose the original Windows 409 with `/reconcile-check` and attempt
+      reconciliation only when the remote reply is verifiable.
+- [ ] Safely validate second turn in same verified Project chat, where permitted.
+- [ ] Project resources, model/effort controls, uploads/downloads, native tools,
+      OpenCode/9Router, other providers remain planned.
+
 ## v0.4.17 — Project chat completion and manual reconciliation
 - [x] Recognize the actual `/g/<project-id>-openagent/c/<uuid>` URL format.
 - [x] Strengthen assistant-turn-scoped Copy completion control detection.

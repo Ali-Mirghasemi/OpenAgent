@@ -387,12 +387,12 @@ class ChatGPTWebProvider(BrowserUIProvider):
         self, *, project_id: str, project_name: str,
         conversation_url: str, user_message: str,
     ) -> ProviderOutput:
-        """Read-only manual reconciliation of a *previously submitted* turn.
+        """Read-only, fail-closed verification of an already submitted turn.
 
-        This never clicks Send or types. The API validates that the journal has
-        one matching unknown turn before invoking it. Only the final visible
-        user/assistant pair is eligible, and completion must be scoped to the
-        assistant turn. Do not leak page text when verification fails.
+        A recovery is *not* a new request. This method never types, clicks or
+        stores any data. Only the API, after checking the unknown journal turn,
+        may atomically commit a verified reply. Error codes are finite and
+        never include DOM text, credentials or remote URLs.
         """
         if not self.supports_project_messages or not self.supports_upstream_conversations:
             raise BrowserUIError("project_messages_disabled", "Project reconciliation is disabled")
@@ -401,11 +401,14 @@ class ChatGPTWebProvider(BrowserUIProvider):
             conversation_url, project_id, expected_origin=origin,
         )
         if expected_chat is None or not project_name or not isinstance(user_message, str) or not user_message:
-            raise BrowserUIError("reconcile_unverified", "Project conversation URL or message is invalid")
+            raise BrowserUIError("reconcile_invalid_input", "Invalid Project recovery parameters")
         async with self._turn_lock:
             await self.browser.start()
             tab_id = "project-reconcile-" + uuid.uuid4().hex
             page = None
+            # The last observed stage is deliberately non-sensitive and helps
+            # distinguish wrong selectors from actual missing completion.
+            stage = "page_not_loaded"
             try:
                 page = await self.browser.open_tab(tab_id, conversation_url)
                 previous, stable = None, 0
@@ -413,46 +416,64 @@ class ChatGPTWebProvider(BrowserUIProvider):
                 while time.monotonic() < deadline:
                     if (parse_project_conversation_id(page.url, project_id, expected_origin=origin)
                             != expected_chat):
-                        raise BrowserUIError("project_mismatch", "Project conversation navigation changed")
+                        raise BrowserUIError("reconcile_route_mismatch", "Project conversation navigation changed")
                     state = await inspect_ui(page, self.site.selectors)
                     if state.state in ("login_required", "security_challenge", "rate_limited", "browser_disconnected"):
-                        raise BrowserUIError("reconcile_unverified", "Project page unavailable for reconciliation")
+                        raise BrowserUIError("reconcile_page_unavailable", "Project page unavailable")
                     users = page.locator('[data-message-author-role="user"]')
                     assistants = page.locator(self.site.selectors.assistant_message)
-                    if await users.count() and await assistants.count():
+                    if not await users.count():
+                        stage = "user_turn_missing"
+                    elif not await assistants.count():
+                        stage = "assistant_turn_missing"
+                    else:
                         user = users.last
                         assistant = assistants.last
-                        # These are DOM nodes, not model responses. Check exact
-                        # user text and that the assistant follows the user.
-                        found_text = " ".join((await user.inner_text()).split())
+                        # Prefer exact content over user-turn wrapper text that
+                        # can contain Edit controls in some responsive layouts.
                         expected_text = " ".join(user_message.split())
-                        follows = await page.evaluate("""(args) => {
-                            const u = args[0], a = args[1];
-                            return !!(u && a && (u.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING));
-                        }""", [await user.element_handle(), await assistant.element_handle()])
-                        if found_text == expected_text and follows:
-                            copy_ready = await self._turn_copy_ready(assistant)
-                            pending = await assistant.locator(TURN_PENDING).count() > 0
-                            markdown = assistant.locator('.markdown')
-                            text = ((await markdown.first.inner_text()) if await markdown.count()
-                                    else (await assistant.inner_text())).strip()
-                            if text and text == previous:
-                                stable += 1
-                            else:
-                                previous, stable = text, 1 if text else 0
-                            if (stable >= self.site.stable_observations and copy_ready
-                                    and not pending and state.state != "generation_in_progress"):
-                                return ProviderOutput(content=text, upstream_conversation_id=expected_chat)
+                        actual_text = " ".join((await user.inner_text()).split())
+                        if actual_text != expected_text:
+                            stage = "user_text_mismatch"
                         else:
-                            previous, stable = None, 0
+                            u_handle = await user.element_handle()
+                            a_handle = await assistant.element_handle()
+                            follows = await page.evaluate("""(args) => {
+                                const u = args[0], a = args[1];
+                                return !!(u && a && (u.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING));
+                            }""", [u_handle, a_handle])
+                            if not follows:
+                                stage = "assistant_not_after_user"
+                            else:
+                                copy_ready = await self._turn_copy_ready(assistant)
+                                pending = await assistant.locator(TURN_PENDING).count() > 0
+                                markdown = assistant.locator('.markdown')
+                                answer = ((await markdown.first.inner_text()) if await markdown.count()
+                                          else (await assistant.inner_text())).strip()
+                                if not answer:
+                                    stage = "assistant_text_empty"
+                                    previous, stable = None, 0
+                                else:
+                                    if answer == previous:
+                                        stable += 1
+                                    else:
+                                        previous, stable = answer, 1
+                                    if pending or state.state == "generation_in_progress":
+                                        stage = "assistant_still_generating"
+                                    elif not copy_ready:
+                                        stage = "completion_marker_missing"
+                                    elif stable < self.site.stable_observations:
+                                        stage = "reply_not_stable"
+                                    else:
+                                        return ProviderOutput(content=answer, upstream_conversation_id=expected_chat)
                     await asyncio.sleep(self.site.poll_s)
-                raise BrowserUIError("reconcile_unverified", "The matching completed Project turn was not verified")
+                raise BrowserUIError("reconcile_" + stage, "Project reply not verifiable: " + stage)
             except BrowserUIError:
                 raise
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                raise BrowserUIError("reconcile_unverified", "Could not verify Project reply") from exc
+                raise BrowserUIError("reconcile_dom_unavailable", "Project DOM could not be inspected") from exc
             finally:
                 if page is not None:
                     await self.browser.close_tab(tab_id)
@@ -605,7 +626,14 @@ class ChatGPTWebProvider(BrowserUIProvider):
             assistant,
         )
         for scope in scopes:
-            if await scope.count() and await scope.locator(TURN_COPY_BUTTON).first.is_visible():
+            if not await scope.count():
+                continue
+            controls = scope.locator(TURN_COPY_BUTTON)
+            # ChatGPT can render the turn's toolbar before it is visually
+            # displayed (hover/focus responsive controls). The existence of a
+            # *turn-scoped* action is stronger evidence than a global Copy
+            # action, but only alongside stable text and a non-busy turn.
+            if await controls.count() > 0 or await controls.first.is_visible():
                 return True
         return False
 

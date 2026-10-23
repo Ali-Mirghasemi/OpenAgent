@@ -1,3 +1,15 @@
+## v0.4.18 Project recovery diagnostics (2026-10-23)
+- Unknown turns are immutable until the original user message, Project route,
+  most recent assistant ordering and completed response are positively verified.
+- `reconcile-check` is read-only even when verification succeeds; it never
+  commits a response, clicks Send or retries. It emits only finite state codes.
+- The separate `/reconcile` operation performs the same read-only verification
+  then atomically commits on success. Failures keep the original unknown lock.
+- A turn-scoped Copy control may be CSS-hidden; presence may be used only with
+  exact paired turns, stable nonempty text and no generation/busy marker.
+- All manual recovery operations require API authentication and match the
+  previously journaled request; no raw conversation text in diagnostic output.
+
 ## v0.4.17 Project reply lifecycle (2026-10-23)
 - User confirmed v0.4.16 sent a Project-scoped prompt and ChatGPT generated the
   expected response, but session API returned 502 and journal marked it unknown.

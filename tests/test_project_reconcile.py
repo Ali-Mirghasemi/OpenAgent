@@ -102,3 +102,56 @@ def test_unknown_reconciliation_requires_same_project_and_message(tmp_path):
         with pytest.raises(SessionBusy):
             store.require_unknown_project_turn(sid,'first',body,expected_project_id=pid)
     store.close()
+
+@pytest.mark.asyncio
+async def test_read_only_reconcile_check_reports_stage_and_does_not_mutate(tmp_path):
+    """The diagnostic may read the remote turn but must not journal a reply."""
+    provider = RecoveryProvider()
+    registry = Registry(); registry.register(provider)
+    store = SessionStore(tmp_path/'check.sqlite')
+    sid = store.create('chatgpt-web/default')['id']
+    store.bind_verified_project(sid, PROJECT_ID, 'OpenAgent')
+    user = Message(role='user', content='Reply with exactly: OpenAgent Project test received.')
+    store.claim_turn(sid, 'project-test-001', user, expected_project_id=PROJECT_ID)
+    store.fail_turn(sid, 'project-test-001')
+    endpoint = f'/openagent/sessions/{sid}/turns/project-test-001/reconcile-check'
+    body = {'message': user.model_dump(mode='json'), 'conversation_url': SLUG_ROUTE}
+    async with AsyncClient(transport=ASGITransport(app=create_app(registry,store)),
+                           base_url='http://test') as client:
+        provider.allow = False
+        r = await client.post(endpoint, json=body)
+        assert r.status_code == 200
+        assert r.json() == {'verifiable': False, 'reason': 'reconcile_unverified',
+                            'submitted': False, 'journal_changed': False}
+        assert store.list_turns(sid)[0]['status'] == 'unknown'
+        provider.allow = True
+        r = await client.post(endpoint, json=body)
+        assert r.status_code == 200 and r.json()['verifiable'] is True
+        assert r.json()['submitted'] is False and r.json()['journal_changed'] is False
+        assert len(store.get(sid)['messages']) == 0
+        assert store.list_turns(sid)[0]['status'] == 'unknown'
+        invalid = await client.post(endpoint, json={**body, 'message':
+            {'role': 'user', 'content': 'different prompt'}})
+        assert invalid.status_code == 409
+        assert len(provider.recovery_calls) == 2
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_reconcile_error_exposes_finite_code_no_dom_text(tmp_path):
+    provider = RecoveryProvider(); provider.allow = False
+    reg = Registry(); reg.register(provider)
+    store = SessionStore(tmp_path/'error.sqlite')
+    sid = store.create('chatgpt-web/default')['id']
+    store.bind_verified_project(sid, PROJECT_ID, 'OpenAgent')
+    message = Message(role='user', content='Secret prompt: do not echo this')
+    store.claim_turn(sid, 'x', message, expected_project_id=PROJECT_ID)
+    store.fail_turn(sid, 'x')
+    async with AsyncClient(transport=ASGITransport(app=create_app(reg,store)), base_url='http://test') as client:
+        r = await client.post(f'/openagent/sessions/{sid}/turns/x/reconcile', json={
+            'message': message.model_dump(mode='json'), 'conversation_url': SLUG_ROUTE})
+        assert r.status_code == 409
+        assert r.json()['error']['code'] == 'reconcile_unverified'
+        assert 'Secret prompt' not in r.text
+    assert store.list_turns(sid)[0]['status'] == 'unknown'
+    store.close()

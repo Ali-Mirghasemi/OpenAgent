@@ -80,3 +80,34 @@ the upstream chat UUID, permitting later continuation under the same session.
 Because `serve --headful` uses one persistent browser profile, the window stays
 open between requests. Stop the server to close it safely; don't close the
 window during an active turn.
+
+
+## v0.4.18: read-only explanation of a 409 reconciliation failure
+
+Windows v0.4.17 passed all 215 tests but its first live `/reconcile` request
+returned 409. The remote assistant reply had been observed in the user's
+screenshot; the specific mismatch in the live DOM is not yet established.
+
+With the same bearer token, original Project session, `unknown` request ID,
+exact submitted user text and original Project conversation URL, call:
+
+```
+POST /openagent/sessions/{session_id}/turns/{request_id}/reconcile-check
+```
+
+The request body is **identical** to `/reconcile`. The response is either
+`{ "verifiable": true, "submitted": false, "journal_changed": false,
+"next_action": "reconcile" }` or `verifiable: false` with a finite `reason`
+code such as `reconcile_user_turn_missing`,
+`reconcile_user_text_mismatch`, `reconcile_assistant_turn_missing`,
+`reconcile_assistant_not_after_user`, `reconcile_completion_marker_missing`,
+`reconcile_assistant_still_generating`, `reconcile_dom_unavailable`, or
+`reconcile_route_mismatch`.
+
+It uses the same fail-closed remote verifier as `/reconcile` but **never commits**.
+A CSS-hidden but assistant-turn-scoped Copy action is now recognized in
+combination with exact last user text, later assistant turn, stable nonempty
+answer and no pending/generating evidence; global Copy buttons never count.
+The original `unknown` state remains locked unless `/reconcile` independently
+verifies and stores the response. Neither operation clicks Send. Diagnostic
+results are not proof that the account permits browser automation.

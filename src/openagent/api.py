@@ -253,6 +253,48 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
                 "type": "provider_error", "code": code, "request_status": "unknown",
             }}, status_code=502)
 
+    @app.post("/openagent/sessions/{session_id}/turns/{request_id}/reconcile-check")
+    async def check_project_reply(session_id: str, request_id: str, body: ProjectTurnReconcile):
+        """Preflight a manually supplied Project reply without editing the journal.
+
+        Finite stage codes only: never return original/remote message text,
+        cookies, DOM HTML or a raw browser URL. No automatic retry or send.
+        """
+        from .providers.browser_ui import BrowserUIError
+        try:
+            session = store.get(session_id)
+            project = session["project"]
+            if project is None:
+                return error_response("Only Project-bound unknown turns can be checked", 422)
+            provider = await registry.resolve(session["model"])
+            inspector = getattr(provider, "reconcile_project_turn", None)
+            if not (getattr(provider, "supports_upstream_conversations", False) and
+                    getattr(provider, "supports_project_messages", False) and callable(inspector)):
+                return error_response("Project reply checking is not enabled", 422)
+            if body.message.role != "user" or not isinstance(body.message.content, str):
+                return error_response("Checking requires the original plain-text user message", 422)
+            store.require_unknown_project_turn(
+                session_id, request_id, body.message, expected_project_id=project["id"],
+            )
+            await inspector(project_id=project["id"], project_name=project["name"],
+                            conversation_url=body.conversation_url, user_message=body.message.content)
+            return {"verifiable": True, "submitted": False, "journal_changed": False,
+                    "next_action": "reconcile"}
+        except SessionNotFound:
+            raise HTTPException(404, "unknown session")
+        except SessionBusy:
+            return error_response("Only an identical unknown turn can be checked", 409, "session_conflict")
+        except BrowserUIError as exc:
+            return {"verifiable": False, "reason": exc.code,
+                    "submitted": False, "journal_changed": False}
+        except (ValueError, TypeError):
+            return {"verifiable": False, "reason": "reconcile_invalid_input",
+                    "submitted": False, "journal_changed": False}
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return error_response("Project reply check unavailable; nothing changed", 503, "provider_error")
+
     @app.post("/openagent/sessions/{session_id}/turns/{request_id}/reconcile")
     async def reconcile_project_turn(session_id: str, request_id: str, body: ProjectTurnReconcile):
         """Explicit read-only remote verification; NEVER submits a message."""
@@ -285,7 +327,12 @@ def create_app(registry: Registry, store: SessionStore, *, api_token: str | None
             raise HTTPException(404, "unknown session")
         except SessionBusy:
             return error_response("Turn cannot be reconciled; journal state is unchanged", 409, "session_conflict")
-        except (BrowserUIError, ValueError, TypeError):
+        except BrowserUIError as exc:
+            return JSONResponse({"error": {
+                "message": "Project reply could not be verified; nothing changed",
+                "type": "provider_error", "code": exc.code,
+            }}, status_code=409)
+        except (ValueError, TypeError):
             return error_response("Project reply could not be verified; nothing changed", 409, "provider_error")
         except asyncio.CancelledError:
             raise

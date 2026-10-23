@@ -1,3 +1,31 @@
+### v0.4.18: diagnose an unresolved Project reply without resubmitting
+
+The first live Project prompt was answered in ChatGPT, but recovery on the
+Windows browser returned 409. Before sending any more turns, inspect the
+**existing** unknown request using the new read-only endpoint:
+
+```powershell
+$base = 'http://127.0.0.1:12321'
+$headers = @{ Authorization = 'Bearer ' + $env:OPENAGENT_API_TOKEN }
+$sid = '<previous-local-session-id>'
+$requestId = '<unknown-request-id>'
+$body = @{
+  conversation_url = '<the existing Project conversation URL>'
+  message = @{role='user'; content='<the EXACT original prompt>'}
+} | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Method Post -Uri "$base/openagent/sessions/$sid/turns/$requestId/reconcile-check" -Headers $headers -ContentType 'application/json' -Body $body
+```
+
+This checks only the original Project conversation and returns `verifiable`
+and, on failure, a finite `reason` (such as `reconcile_user_text_mismatch`,
+`reconcile_completion_marker_missing` or `reconcile_assistant_turn_missing`).
+It does not modify the SQLite journal, navigate to another Project, send a
+message or expose remote conversation text. If `verifiable: true`, use the
+existing `/reconcile` endpoint with the **same body** to commit the verified
+answer. The original unknown request must **never** be submitted again.
+
+See [docs/project-native-routing.md](docs/project-native-routing.md).
+
 ### v0.4.17 Project conversation recovery (experimental)
 
 ChatGPT can navigate to `/g/<project-id>-<name>/c/<uuid>` after the first

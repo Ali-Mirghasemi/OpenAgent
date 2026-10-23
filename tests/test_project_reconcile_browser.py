@@ -68,12 +68,12 @@ async def test_manual_reconcile_fails_on_wrong_reply_or_other_project_chromium(t
         with pytest.raises(BrowserUIError) as exc:
             await provider.reconcile_project_turn(project_id=PROJECT_ID, project_name='OpenAgent',
                 conversation_url=URL, user_message='Other message')
-        assert exc.value.code == 'reconcile_unverified'
+        assert exc.value.code == 'reconcile_user_text_mismatch'
         assert proxy.click_counts == [0]
         with pytest.raises(BrowserUIError) as exc:
             await provider.reconcile_project_turn(project_id=PROJECT_ID, project_name='OpenAgent',
                 conversation_url=f'{ORIGIN}/g/{OTHER_ID}-openagent/c/{CID}', user_message=PROMPT)
-        assert exc.value.code == 'reconcile_unverified'
+        assert exc.value.code == 'reconcile_invalid_input'
         assert proxy.click_counts == [0]
 
 
@@ -91,5 +91,43 @@ async def test_reconcile_rejects_reply_without_copy_completion_chromium(tmp_path
         with pytest.raises(BrowserUIError) as exc:
             await provider.reconcile_project_turn(project_id=PROJECT_ID, project_name='OpenAgent',
                 conversation_url=URL, user_message=PROMPT)
-        assert exc.value.code == 'reconcile_unverified'
+        assert exc.value.code == 'reconcile_completion_marker_missing'
+        assert proxy.click_counts == [0]
+
+@pytest.mark.asyncio
+async def test_reconcile_accepts_turn_scoped_hidden_copy_control_chromium(tmp_path):
+    """Hidden hover-toolbar button still signals a finished, idle last turn."""
+    executable = find_chromium_executable()
+    if not executable: pytest.skip('No Chromium executable')
+    pytest.importorskip('playwright')
+    html = HTML.replace('<button aria-label="Copy">Copy</button>',
+                        '<button aria-label="Copy" style="display:none">Copy</button>')
+    browser = BrowserManager(BrowserConfig(profile_dir=tmp_path/'browser'), backend=LocalContentBackend(executable, html))
+    async with browser:
+        proxy = ReadOnlyBrowser(browser)
+        provider = ChatGPTWebProvider(proxy, url=ORIGIN+'/', timeout_s=2, poll_s=.04,
+                    stable_observations=2, enable_conversation_continuation=True, enable_project_messages=True)
+        result = await provider.reconcile_project_turn(project_id=PROJECT_ID, project_name='OpenAgent',
+                  conversation_url=URL, user_message=PROMPT)
+        assert result.content == ANSWER
+        assert proxy.click_counts == [0]
+
+
+@pytest.mark.asyncio
+async def test_reconcile_rejects_assistant_before_user_chromium(tmp_path):
+    executable = find_chromium_executable()
+    if not executable: pytest.skip('No Chromium executable')
+    pytest.importorskip('playwright')
+    html = HTML.replace(f'<main><article data-turn-id="user-1"><div data-message-author-role="user">{PROMPT}</div></article>',
+                        '<main>')
+    html = html.replace('</main><form>', f'<article data-turn-id="user-1"><div data-message-author-role="user">{PROMPT}</div></article></main><form>')
+    browser = BrowserManager(BrowserConfig(profile_dir=tmp_path/'browser'), backend=LocalContentBackend(executable, html))
+    async with browser:
+        proxy = ReadOnlyBrowser(browser)
+        provider = ChatGPTWebProvider(proxy, url=ORIGIN+'/', timeout_s=1.1, poll_s=.03,
+                    stable_observations=2, enable_conversation_continuation=True, enable_project_messages=True)
+        with pytest.raises(BrowserUIError) as exc:
+            await provider.reconcile_project_turn(project_id=PROJECT_ID, project_name='OpenAgent',
+                conversation_url=URL, user_message=PROMPT)
+        assert exc.value.code == 'reconcile_assistant_not_after_user'
         assert proxy.click_counts == [0]
